@@ -1,3 +1,4 @@
+import gc
 import os
 import json
 import zipfile
@@ -6,7 +7,8 @@ from typing import List
 from pathlib import Path
 from ...serializer.osm.osm_graph import OSMGraph
 from ...serializer.counters import WayCounter, NodeCounter, PointCounter, LineCounter, ZoneCounter, PolygonCounter
-from ...serializer.osw.osw_normalizer import OSWWayNormalizer, OSWNodeNormalizer, OSWPointNormalizer, OSWLineNormalizer, OSWZoneNormalizer, OSWPolygonNormalizer
+from ...serializer.osw.osw_normalizer import OSWWayNormalizer, OSWNodeNormalizer, OSWPointNormalizer, OSWLineNormalizer, \
+    OSWZoneNormalizer, OSWPolygonNormalizer
 
 
 class OSWHelper:
@@ -24,17 +26,17 @@ class OSWHelper:
     def osw_point_filter(tags):
         normalizer = OSWPointNormalizer(tags)
         return normalizer.filter()
-    
+
     @staticmethod
     def osw_line_filter(tags):
         normalizer = OSWLineNormalizer(tags)
         return normalizer.filter()
-    
+
     @staticmethod
     def osw_zone_filter(tags):
         normalizer = OSWZoneNormalizer(tags)
         return normalizer.filter()
-    
+
     @staticmethod
     def osw_polygon_filter(tags):
         normalizer = OSWPolygonNormalizer(tags)
@@ -104,6 +106,8 @@ class OSWHelper:
             OSWHelper.osw_polygon_filter
         )
 
+        gc.collect()
+
         return OG
 
     @staticmethod
@@ -121,6 +125,7 @@ class OSWHelper:
                     if optional_file in extracted_file:
                         file_locations[optional_file] = f"{output}/{extracted_file}"
 
+            gc.collect()
             return file_locations
 
     @staticmethod
@@ -136,6 +141,9 @@ class OSWHelper:
         output_path = Path(output, f'{prefix}.graph.all.geojson')
         with open(output_path, 'w') as f:
             json.dump(fc, f)
+
+        del f
+        gc.collect()
 
         return str(output_path)
 
@@ -158,8 +166,12 @@ class OSWHelper:
         lines_path = Path(workdir, f'{filename}.graph.lines.geojson')
         zones_path = Path(workdir, f'{filename}.graph.zones.geojson')
         polygons_path = Path(workdir, f'{filename}.graph.polygons.geojson')
-        await loop.run_in_executor(None, og.to_geojson, nodes_path, edges_path, points_path, lines_path, zones_path, polygons_path)
+        await loop.run_in_executor(None, og.to_geojson, nodes_path, edges_path, points_path, lines_path, zones_path,
+                                   polygons_path)
         # for the fi
-        pot_gen_files = [str(nodes_path), str(edges_path), str(points_path), str(lines_path), str(zones_path), str(polygons_path)]
-        generated_files = [ file for file in pot_gen_files if os.path.exists(file) ]
+        pot_gen_files = [str(nodes_path), str(edges_path), str(points_path), str(lines_path), str(zones_path),
+                         str(polygons_path)]
+        generated_files = [file for file in pot_gen_files if os.path.exists(file)]
+        del og
+        gc.collect()
         return generated_files

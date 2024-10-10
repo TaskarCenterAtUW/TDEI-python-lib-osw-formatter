@@ -1,9 +1,10 @@
+import gc
 import os
 import asyncio
+import traceback
 from pathlib import Path
-from ..serializer.counters import WayCounter, PointCounter, NodeCounter, LineCounter, ZoneCounter, PolygonCounter
-from ..helpers.response import Response
 from ..helpers.osw import OSWHelper
+from ..helpers.response import Response
 
 
 class OSM2OSW:
@@ -16,18 +17,6 @@ class OSM2OSW:
 
     async def convert(self) -> Response:
         try:
-            print('Estimating number of ways, nodes, points, lines, zones and polygons in datasets...')
-            tasks = [
-                OSWHelper.count_entities(self.osm_file_path, WayCounter),
-                OSWHelper.count_entities(self.osm_file_path, NodeCounter),
-                OSWHelper.count_entities(self.osm_file_path, PointCounter),
-                OSWHelper.count_entities(self.osm_file_path, LineCounter),
-                OSWHelper.count_entities(self.osm_file_path, ZoneCounter),
-                OSWHelper.count_entities(self.osm_file_path, PolygonCounter)
-            ]
-
-            count_results = await asyncio.gather(*tasks)
-
             print('Creating networks from region extracts...')
             tasks = [OSWHelper.get_osm_graph(self.osm_file_path)]
             osm_graph_results = await asyncio.gather(*tasks)
@@ -35,7 +24,6 @@ class OSM2OSW:
             OG = osm_graph_results[0]
 
             await OSWHelper.simplify_og(OG)
-
             await OSWHelper.construct_geometries(OG)
 
             # for OG in osm_graph_results:
@@ -43,9 +31,16 @@ class OSM2OSW:
 
             print(f'Created OSW files!')
             self.generated_files = generated_files
-            resp = Response(status=True, generated_files=generated_files)
+
+            del tasks
+            del osm_graph_results
+            del OG
+            del generated_files
+            resp = Response(status=True, generated_files=self.generated_files)
         except Exception as error:
+            traceback.print_exc()
             print(error)
             resp = Response(status=False, error=str(error))
+        finally:
+            gc.collect()
         return resp
-

@@ -1,5 +1,8 @@
 # Change log
 
+### 0.2.4
+- Fixes MemoryError issue
+
 ### 0.2.3
 - Fixes dependencies
 

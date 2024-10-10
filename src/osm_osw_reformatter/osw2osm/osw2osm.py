@@ -1,3 +1,4 @@
+import gc
 import ogr2osm
 from pathlib import Path
 from ..helpers.osw import OSWHelper
@@ -32,10 +33,16 @@ class OSW2OSM:
             data_writer = ogr2osm.OsmDataWriter(output_file, suppress_empty_tags=True)
             osm_data.output(data_writer)
 
+            del translation_object
+            del datasource
+            del osm_data
+            del data_writer
             # Delete merge file
             Path(input_file).unlink()
             resp = Response(status=True, generated_files=str(output_file))
         except Exception as error:
             print(error)
             resp = Response(status=False, error=str(error))
+        finally:
+            gc.collect()
         return resp
