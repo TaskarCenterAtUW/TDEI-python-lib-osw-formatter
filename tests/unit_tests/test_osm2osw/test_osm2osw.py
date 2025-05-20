@@ -85,7 +85,7 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
                         geojson = json.load(f)
                         for feature in geojson.get('features', []):
                             props = feature.get('properties', {})
-                            if any(k.startswith("ext") for k in props):
+                            if any(k.startswith("ext:") for k in props):
                                 has_ext_tag = True
                                 break
                     if has_ext_tag:

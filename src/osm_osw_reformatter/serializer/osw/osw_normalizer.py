@@ -506,7 +506,7 @@ def _normalize(tags, keep_keys, defaults):
     new_tags.update(defaults)
 
     # Keep all tags that start with "ext"
-    ext_tags = {k: v for k, v in tags.items() if k.startswith("ext")}
+    ext_tags = {k: v for k, v in tags.items() if k.startswith("ext:")}
     new_tags.update(ext_tags)
 
     return new_tags
