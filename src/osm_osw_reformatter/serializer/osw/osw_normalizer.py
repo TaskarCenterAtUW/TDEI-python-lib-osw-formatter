@@ -508,7 +508,7 @@ def _normalize(tags, keep_keys, defaults):
     # Keep all tags that start with "ext:"
     ext_tags = {k: v for k, v in tags.items() if k.startswith("ext:")}
 
-    return {**new_tags, **defaults, **ext_tags}
+    return {**{**new_tags, **defaults}, **new_tags}
 
     
 def tactile_paving(tag_value, tags):
