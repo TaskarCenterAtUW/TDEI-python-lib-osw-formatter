@@ -249,7 +249,8 @@ class OSWPointNormalizer:
         elif self.is_street_lamp():
             return self._normalize_point({"highway": str})
         else:
-            raise ValueError("This is an invalid point")
+            print(f"Invalid point skipped. Tags: {self.tags}")
+            return {}
     
     def _normalize_point(self, keep_keys={}, defaults = {}):
         generic_keep_keys = {}
@@ -508,7 +509,7 @@ def _normalize(tags, keep_keys, defaults):
     # Keep all tags that start with "ext:"
     ext_tags = {k: v for k, v in tags.items() if k.startswith("ext:")}
 
-    return {**{**new_tags, **defaults}, **new_tags}
+    return {**{**new_tags, **defaults}, **{**new_tags, **ext_tags}}
 
     
 def tactile_paving(tag_value, tags):

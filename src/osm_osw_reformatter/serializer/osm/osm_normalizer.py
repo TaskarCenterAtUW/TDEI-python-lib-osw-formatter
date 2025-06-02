@@ -38,5 +38,12 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         ogr feature and ogr geometry used to create the object are passed as
         well. Note that any return values will be discarded by ogr2osm.
         '''
-        if osmgeometry.tags['_id'][0]:
-            osmgeometry.id = int(osmgeometry.tags.pop('_id')[0])
+        osm_id = None
+        # ext:osm_id is probably in the tags dictionary as 'ext:osm_id' or similar
+        if 'ext:osm_id' in osmgeometry.tags and osmgeometry.tags['ext:osm_id'][0]:
+            osm_id = int(osmgeometry.tags['ext:osm_id'][0])
+        elif '_id' in osmgeometry.tags and osmgeometry.tags['_id'][0]:
+            osm_id = int(osmgeometry.tags['_id'][0])
+
+        if osm_id is not None:
+            osmgeometry.id = osm_id
