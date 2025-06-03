@@ -59,7 +59,8 @@ class TestOSMGraph(unittest.TestCase):
         self.mock_graph.add_node(
             2, geometry=Point(2, 2), lon=2, lat=2, osm_id="test_node_2"
         )
-        self.mock_graph.add_edge(1, 2, geometry=LineString([(1, 1), (2, 2)]))
+        # Add an edge with geometry **and osm_id**
+        self.mock_graph.add_edge(1, 2, geometry=LineString([(1, 1), (2, 2)]), osm_id="test_edge_1_2")
 
         # Paths for test files
         edges_path = "test_edges.geojson"

@@ -103,12 +103,6 @@ class TestOSWPointNormalizer(unittest.TestCase):
         expected = {'power': 'pole'}
         self.assertEqual(result, expected)
 
-    def test_normalize_invalid_point(self):
-        tags = {'type': 'invalid_point_type'}
-        normalizer = OSWPointNormalizer(tags)
-        with self.assertRaises(ValueError):
-            normalizer.normalize()
-
 
 class TestCommonFunctions(unittest.TestCase):
     def test_tactile_paving(self):

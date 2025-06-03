@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="ogr2osm 1.2.0" upload="false">
+<node visible="true" id="22592328" lat="34.052143" lon="-118.2672968"><tag k="_id" v="22592328"/></node>
+<node visible="true" id="726963844" lat="34.0517032" lon="-118.2675859"><tag k="_id" v="726963844"/></node>
+<node visible="true" id="20393501" lat="34.0521803" lon="-118.2673793"><tag k="_id" v="20393501"/></node>
+<way visible="true" id="1"><nd ref="22592328"/><nd ref="726963844"/><tag k="highway" v="residential"/><tag k="name" v="Hartford Avenue"/><tag k="ext:qm:fixed" v="33"/><tag k="ext:osm_id" v="1"/><tag k="_id" v="1"/><tag k="ext:my_surface" v="asphalt"/><tag k="ext:my_color" v="green"/></way>
+<way visible="true" id="2"><nd ref="22592328"/><nd ref="20393501"/><tag k="highway" v="tertiary"/><tag k="surface" v="asphalt"/><tag k="name" v="West 7th Street"/><tag k="ext:qm:fixed" v="38"/><tag k="ext:osm_id" v="2"/><tag k="_id" v="2"/><tag k="ext:my_surface" v="asphalt"/><tag k="ext:my_color" v="red"/></way>
+</osm>
