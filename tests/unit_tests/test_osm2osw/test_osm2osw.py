@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import asyncio
 import unittest
 from src.osm_osw_reformatter.osm2osw.osm2osw import OSM2OSW
@@ -68,6 +69,120 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
 
         result = await osm2osw.convert()
         self.assertFalse(result.status)
+
+    def test_ext_tags_present_in_output(self):
+        osm_file_path = TEST_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
+            result = await osm2osw.convert()
+            self.assertTrue(result.status)
+
+            has_ext_tag = False
+            for file_path in result.generated_files:
+                if file_path.endswith('.geojson'):
+                    with open(file_path) as f:
+                        geojson = json.load(f)
+                        for feature in geojson.get('features', []):
+                            props = feature.get('properties', {})
+                            if any(k.startswith("ext:") for k in props):
+                                has_ext_tag = True
+                                break
+                    if has_ext_tag:
+                        break
+
+            self.assertTrue(has_ext_tag, "No ext: tags found in generated GeoJSON features")
+
+            for file_path in result.generated_files:
+                os.remove(file_path)
+
+        asyncio.run(run_test())
+
+    def test_nodes_file_has_point_geometry(self):
+        osm_file_path = TEST_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
+            result = await osm2osw.convert()
+            self.assertTrue(result.status)
+
+            for file_path in result.generated_files:
+                if "nodes" in file_path:
+                    with open(file_path) as f:
+                        geojson = json.load(f)
+                        for feature in geojson["features"]:
+                            self.assertEqual(feature["geometry"]["type"], "Point")
+                    break
+
+            for file_path in result.generated_files:
+                os.remove(file_path)
+
+        asyncio.run(run_test())
+
+    def test_all_feature_ids_are_strings(self):
+        osm_file_path = TEST_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
+            result = await osm2osw.convert()
+            self.assertTrue(result.status)
+
+            for file_path in result.generated_files:
+                with open(file_path) as f:
+                    geojson = json.load(f)
+                    for feature in geojson.get("features", []):
+                        self.assertIn("_id", feature["properties"])
+                        self.assertIsInstance(feature["properties"]["_id"], str)
+
+            for file_path in result.generated_files:
+                os.remove(file_path)
+
+        asyncio.run(run_test())
+
+
+    def test_no_empty_features(self):
+        osm_file_path = TEST_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
+            result = await osm2osw.convert()
+            self.assertTrue(result.status)
+
+            for file_path in result.generated_files:
+                with open(file_path) as f:
+                    geojson = json.load(f)
+                    for feature in geojson.get("features", []):
+                        self.assertIn("geometry", feature)
+                        self.assertIsNotNone(feature["geometry"])
+                        self.assertIn("type", feature["geometry"])
+                        self.assertIn("coordinates", feature["geometry"])
+
+            for file_path in result.generated_files:
+                os.remove(file_path)
+
+        asyncio.run(run_test())
+
+    def test_no_duplicate_ids_in_file(self):
+        osm_file_path = TEST_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
+            result = await osm2osw.convert()
+            self.assertTrue(result.status)
+
+            for file_path in result.generated_files:
+                with open(file_path) as f:
+                    geojson = json.load(f)
+                    seen_ids = set()
+                    for feature in geojson.get("features", []):
+                        _id = feature["properties"].get("_id")
+                        self.assertNotIn(_id, seen_ids, f"Duplicate _id: {_id} in {file_path}")
+                        seen_ids.add(_id)
+
+            for file_path in result.generated_files:
+                os.remove(file_path)
+
+        asyncio.run(run_test())
 
 
 if __name__ == '__main__':

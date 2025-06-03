@@ -1,5 +1,15 @@
 # Change log
 
+### 0.2.7
+- Fixed [BUG 1654](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/1654)
+- Added functionality to retain the `ext` tags
+## Unit Tests
+- Verified all output files are valid GeoJSON FeatureCollections
+- Ensured `nodes` files contain only Point geometries
+- Validated that all feature `_id` properties are strings
+- Asserted no features are missing geometry or coordinates
+- Checked that no duplicate `_id` values exist within any generated file
+
 ### 0.2.6
 - Added unit test cases
 - Added unit test cases pipeline

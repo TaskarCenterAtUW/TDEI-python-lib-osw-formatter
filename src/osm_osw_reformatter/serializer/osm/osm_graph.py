@@ -162,6 +162,9 @@ class OSMLineParser(osmium.SimpleHandler):
         for i in range(len(w.nodes)):
             u = w.nodes[i]
 
+            if not u.location.valid():
+                continue
+
             u_lon = float(u.lon)
             u_lat = float(u.lat)
 
@@ -304,6 +307,17 @@ class OSMPolygonParser(osmium.SimpleHandler):
                 self.G.add_node("g" + str(a.id), **d3)
             exteriors_count = exteriors_count + 1
 
+class OSMTaggedNodeParser(osmium.SimpleHandler):
+    def __init__(self, G: nx.MultiDiGraph):
+        osmium.SimpleHandler.__init__(self)
+        self.G = G
+
+    def node(self, n):
+        # Only add nodes with tags
+        if n.tags and len(n.tags) > 0:
+            d = dict(n.tags)
+            # Store OSM node id as string (to match the pattern in your output)
+            self.G.add_node(n.id, lon=n.location.lon, lat=n.location.lat, **d)
 
 class OSMGraph:
     def __init__(self, G: nx.MultiDiGraph = None) -> None:
@@ -312,6 +326,11 @@ class OSMGraph:
 
         # Geodesic distance calculator. Assumes WGS84-like geometries.
         self.geod = pyproj.Geod(ellps='WGS84')
+
+    def node(self, n):
+        if len(n.tags) > 0 and n.id not in self.G.nodes:
+            d = dict(n.tags)
+            self.G.add_node(n.id, lon=n.location.lon, lat=n.location.lat, **d)
 
     @classmethod
     def from_osm_file(
@@ -338,6 +357,13 @@ class OSMGraph:
         line_parser.apply_file(osm_file, locations=True)
         G = line_parser.G
         del line_parser
+
+        # --- PATCH START: Add all loose/tagged nodes ---
+        tagged_node_parser = OSMTaggedNodeParser(G)
+        tagged_node_parser.apply_file(osm_file)
+        G = tagged_node_parser.G
+        del tagged_node_parser
+        # --- PATCH END ---
 
         # zone_parser = OSMZoneParser(G, zone_filter, progressbar=progressbar)
         # zone_parser.apply_file(osm_file)
@@ -570,6 +596,8 @@ class OSMGraph:
             d_copy['_u_id'] = str(u)
             d_copy['_v_id'] = str(v)
 
+            d_copy['ext:osm_id'] = str(d['osm_id'])
+
             if 'osm_id' in d_copy:
                 d_copy.pop('osm_id')
 
@@ -591,6 +619,7 @@ class OSMGraph:
         for n, d in self.G.nodes(data=True):
             d_copy = {**d}
             d_copy["_id"] = str(n)[1:]
+            d_copy['ext:osm_id'] = str(d_copy.get('osm_id', d_copy["_id"]))
 
             if OSWPointNormalizer.osw_point_filter(d):
                 geometry = mapping(d_copy.pop("geometry"))
