@@ -1,12 +1,13 @@
 import os
 import asyncio
 from osm_osw_reformatter import Formatter
+import time
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 OUTPUT_DIR = f'{ROOT_DIR}/output'
 OSM_INPUT_FILE = f'{ROOT_DIR}/input/wedgewood_output.osm.pbf'
-OSW_INPUT_FILE = f'{ROOT_DIR}/input/wa.seattle.zip'
+OSW_INPUT_FILE = f'{ROOT_DIR}/input/king-county-zipped.zip'
 
 is_exists = os.path.exists(OUTPUT_DIR)
 if not is_exists:
@@ -28,5 +29,8 @@ def osw_convert():
 
 
 if __name__ == '__main__':
-    asyncio.run(osm_convert())
+    # asyncio.run(osm_convert())
+    start_time = time.time()
     osw_convert()
+    end_time = time.time()
+    print(f'OSW to OSM conversion took {end_time - start_time:.2f} seconds')

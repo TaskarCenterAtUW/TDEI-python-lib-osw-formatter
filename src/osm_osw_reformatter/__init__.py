@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from .osm2osw.osm2osw import OSM2OSW
 from .osw2osm.osw2osm import OSW2OSM
+from .osw2osm.osw2osm_new import OSW2OSMNew
 from .helpers.response import Response
 from .version import __version__
 
@@ -27,7 +28,7 @@ class Formatter:
         return result
 
     def osw2osm(self) -> Response:
-        convert = OSW2OSM(zip_file_path=self.file_path, workdir=self.workdir, prefix=self.prefix)
+        convert = OSW2OSMNew(zip_file_path=self.file_path, workdir=self.workdir, prefix=self.prefix)
         result = convert.convert()
         self.generated_files = [result.generated_files]
         return result
