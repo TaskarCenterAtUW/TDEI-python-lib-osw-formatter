@@ -1,6 +1,6 @@
 import unittest
 from src.osm_osw_reformatter.serializer.osw.osw_normalizer import OSWWayNormalizer, OSWNodeNormalizer, \
-    OSWPointNormalizer, tactile_paving, surface, crossing_markings, climb
+    OSWPointNormalizer, tactile_paving, surface, crossing_markings, climb, _normalize
 
 
 class TestOSWWayNormalizer(unittest.TestCase):
@@ -125,6 +125,54 @@ class TestCommonFunctions(unittest.TestCase):
         self.assertEqual(climb('up', {}), 'up')
         self.assertEqual(climb('down', {}), 'down')
         self.assertIsNone(climb('invalid_value', {}))
+
+
+class TestNormalizeWidthField(unittest.TestCase):
+    def test_removes_width_when_value_is_nan_string(self):
+        generic_keep_keys = {"highway": str, "width": float}
+        generic_defaults = {}
+        tags = {"highway": "footway", "width": 'NaN'}
+        normalizer = _normalize(tags, generic_keep_keys, generic_defaults)
+        self.assertIsInstance(normalizer, dict)
+        self.assertIn('highway', normalizer)
+        self.assertNotIn('width', normalizer)
+
+    def test_removes_width_when_value_is_non_numeric_string(self):
+        generic_keep_keys = {"highway": str, "width": float}
+        generic_defaults = {}
+        tags = {"highway": "footway", "width": 'hello'}
+        normalizer = _normalize(tags, generic_keep_keys, generic_defaults)
+        self.assertIsInstance(normalizer, dict)
+        self.assertIn('highway', normalizer)
+        self.assertNotIn('width', normalizer)
+
+    def test_preserves_width_when_value_is_float(self):
+        generic_keep_keys = {"highway": str, "width": float}
+        generic_defaults = {}
+        tags = {"highway": "footway", "width": 1.2}
+        normalizer = _normalize(tags, generic_keep_keys, generic_defaults)
+        self.assertIsInstance(normalizer, dict)
+        self.assertIn('highway', normalizer)
+        self.assertIn('width', normalizer)
+
+    def test_preserves_width_when_value_is_int(self):
+        generic_keep_keys = {"highway": str, "width": float}
+        generic_defaults = {}
+        tags = {"highway": "footway", "width": 10}
+        normalizer = _normalize(tags, generic_keep_keys, generic_defaults)
+        self.assertIsInstance(normalizer, dict)
+        self.assertIn('highway', normalizer)
+        self.assertIn('width', normalizer)
+
+    def test_removes_width_when_value_is_actual_nan(self):
+        generic_keep_keys = {"highway": str, "width": float}
+        generic_defaults = {}
+        tags = {"highway": "footway", "width": float('nan')}
+        normalizer = _normalize(tags, generic_keep_keys, generic_defaults)
+        self.assertIsInstance(normalizer, dict)
+        self.assertIn('highway', normalizer)
+        self.assertNotIn('width', normalizer)
+
 
 
 if __name__ == '__main__':

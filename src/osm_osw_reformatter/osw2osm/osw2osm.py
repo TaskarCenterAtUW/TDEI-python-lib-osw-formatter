@@ -41,7 +41,7 @@ class OSW2OSM:
             Path(input_file).unlink()
             resp = Response(status=True, generated_files=str(output_file))
         except Exception as error:
-            print(error)
+            print(f'Error during conversion: {error}')
             resp = Response(status=False, error=str(error))
         finally:
             gc.collect()
