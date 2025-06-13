@@ -1,4 +1,5 @@
 import types
+import math
 OSW_SCHEMA_ID = "https://sidewalks.washington.edu/opensidewalks/0.2/schema.json"
 
 class OSWWayNormalizer:
@@ -463,6 +464,13 @@ class OSWZoneNormalizer:
     
     def is_pedestrian(self):
         return self.tags.get("highway", "") == "pedestrian"
+
+
+def check_nan_and_raise(tag_type, temp):
+    if (tag_type == float or tag_type == int) and math.isnan(temp):
+        raise ValueError("Value cannot be NaN")
+    return temp
+
     
 def _normalize(tags, keep_keys, defaults):
     new_tags = {}
@@ -474,12 +482,14 @@ def _normalize(tags, keep_keys, defaults):
                 elif isinstance(tag_type[1], types.FunctionType):
                     temp = tag_type[1](tags[tag], tags)
                     if temp is not None:
+                        check_nan_and_raise(tag_type[0], temp)
                         new_tags[tag_type[0]] = temp
                     else:
                         raise ValueError
                 else:
                     temp = tag_type[1](tags[tag])
                     if temp is not None:
+                        check_nan_and_raise(tag_type[0], temp)
                         new_tags[tag_type[0]] = temp
                     else:
                         raise ValueError
@@ -489,12 +499,14 @@ def _normalize(tags, keep_keys, defaults):
                 elif isinstance(tag_type, types.FunctionType):
                     temp = tag_type(tags[tag], tags)
                     if temp is not None:
+                        check_nan_and_raise(tag_type, temp)
                         new_tags[tag] = temp
                     else:
                         raise ValueError
                 else:
                     temp = tag_type(tags[tag])
                     if temp is not None:
+                        check_nan_and_raise(tag_type, temp)
                         new_tags[tag] = temp
                     else:
                         raise ValueError
