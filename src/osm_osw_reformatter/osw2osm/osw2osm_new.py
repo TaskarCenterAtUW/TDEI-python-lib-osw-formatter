@@ -79,8 +79,10 @@ class OSW2OSMNew:
                 for _, row in tqdm(nodes_gdf.iterrows(), total=nodes_gdf.shape[0], desc='Writing Nodes'):
                     node_element = self.make_node_element(row)
                     xf.write(node_element)
+                    xf.write("\n")
                 for _, row in tqdm(edges_gdf.iterrows(), total=edges_gdf.shape[0], desc='Writing Ways'):
                     way_element = self.make_way_element(row)
                     xf.write(way_element)
+                    xf.write("\n")
 
         
