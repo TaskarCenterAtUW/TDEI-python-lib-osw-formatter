@@ -56,14 +56,58 @@ class OSW2OSMNew:
             # Get a hash for each point
             nodes_gdf['hash'] = nodes_gdf['geometry'].progress_apply(lambda x: hash(str(x)))
             edges_gdf = gpd.read_file(edges_file)
+            edge_node_hash_gdf = gpd.GeoDataFrame()
+            all_points = []
+            all_hashes = []
+            for index, row in tqdm(edges_gdf.iterrows(), total=edges_gdf.shape[0], desc='Processing Edges'):
+                geometry = row['geometry']
+                if geometry is None:
+                    print(f'Edge {row["_id"]} has no geometry')
+                    continue
+
+                coords = list(geometry.coords)
+    
+                for coord in coords:
+                    pt = Point(coord)
+                    all_points.append(pt)
+                    all_hashes.append(hash(coord))  # hash the tuple, faster and simpler
+                # geometry = row['geometry']
+                # # points = list(geometry.coords)
+                # if geometry is None:
+                #     print(f'Edge {row["_id"]} has no geometry')
+                #     continue
+                # points = [Point(p) for p in geometry.coords]
+                # hashes = [hash(str(point)) for point in points]
+                # points_gdf = gpd.GeoDataFrame({'geometry': points, 'hash': hashes}, geometry='geometry')
+                # edge_node_hash_gdf = pd.concat([edge_node_hash_gdf, points_gdf])
+            edge_node_hash_gdf = gpd.GeoDataFrame(
+                   {'geometry': all_points, 'hash': all_hashes},
+                geometry='geometry'
+                )
+            # Merge the edge_node_hash_gdf with nodes_gdf to get the node ids
+            nodes_nodups_gdf = nodes_gdf.drop_duplicates(subset='hash')
+            nodes_hash_gdf = pd.concat([nodes_gdf[['hash', 'geometry']], edge_node_hash_gdf])
+            nodes_hash_gdf = nodes_hash_gdf.drop_duplicates(subset='hash')
+            nodes_hash_gdf = nodes_hash_gdf.reset_index(drop=True)
+            merged_nodes_gdf = nodes_hash_gdf.merge(nodes_nodups_gdf.drop(columns=['geometry']), on='hash', how='left')
+            missing_mask = merged_nodes_gdf['_id'].isnull()
+            num_missing = missing_mask.sum()
+            negative_ids = [-i for i in range(1, num_missing + 1)]
+            merged_nodes_gdf.loc[missing_mask, '_id'] = negative_ids
+            print(f'Found {missing_mask.sum()} missing node ids')
             # Get a hash for each line
             edges_gdf['hash'] = edges_gdf['geometry'].progress_apply(self.get_line_hashes)
-            self.node_hash_dictionary = pd.Series(nodes_gdf['_id'].values, index=nodes_gdf['hash']).to_dict()
+            self.node_hash_dictionary = pd.Series(merged_nodes_gdf['_id'].values, index=merged_nodes_gdf['hash']).to_dict()
             edges_gdf['ndref'] = edges_gdf['hash'].progress_apply(self.map_hashes_to_ids)
+            # We dont need self.node_hash_dictionary anymore, so we can delete it
+            del self.node_hash_dictionary
+            del nodes_gdf
+            del nodes_hash_gdf
+            del edge_node_hash_gdf
             # print(edges_gdf.head())
             print(f'Writing file in xml')
             # Write to ET file
-            self.write_to_et(edges_gdf, nodes_gdf)
+            self.write_to_et(edges_gdf, merged_nodes_gdf)
             resp = Response(status=True, generated_files=str(''))
             return resp
         except Exception as error:
