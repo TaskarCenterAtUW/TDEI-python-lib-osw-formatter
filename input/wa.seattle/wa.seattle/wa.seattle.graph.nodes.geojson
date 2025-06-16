@@ -1,0 +1,11 @@
+{
+"$schema": "https://sidewalks.washington.edu/opensidewalks/0.2/schema.json", 
+"type": "FeatureCollection", 
+"features": [
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3046167, 47.6478238]}, "properties": {"_id": "29464594"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3046138, 47.6476887]}, "properties": {"_id": "2938080342"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3040434, 47.6441101]}, "properties": {"_id": "11406900249"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3043457, 47.6446513]}, "properties": {"_id": "7010447307"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3083638, 47.656524]}, "properties": {"_id": "29939251"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3080677, 47.6563183]}, "properties": {"_id": "8948744654"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3885324, 47.6321316]}, "properties": {"_id": "11420627235"}}]}

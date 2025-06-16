@@ -1,0 +1,11 @@
+{
+"$schema": "https://sidewalks.washington.edu/opensidewalks/0.2/schema.json", 
+"type": "FeatureCollection", 
+"features": [
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3471602, 47.6486562]}, "properties": {"barrier": "bollard", "_id": "29937496"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3430392, 47.5102755]}, "properties": {"barrier": "bollard", "_id": "53074239"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3365812, 47.7195786]}, "properties": {"barrier": "bollard", "_id": "53113375"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.2663767, 47.4885648]}, "properties": {"barrier": "bollard", "_id": "53125290"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3292384, 47.5926484]}, "properties": {"emergency": "fire_hydrant", "_id": "53128669"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3496642, 47.7087679]}, "properties": {"barrier": "bollard", "_id": "252344913"}}, 
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.3340056, 47.5727483]}, "properties": {"emergency": "fire_hydrant", "_id": "11449675657"}}]}
