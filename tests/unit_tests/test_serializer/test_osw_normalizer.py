@@ -173,6 +173,16 @@ class TestNormalizeWidthField(unittest.TestCase):
         self.assertIn('highway', normalizer)
         self.assertNotIn('width', normalizer)
 
+    def test_preserves_width_when_value_is_float_with_string(self):
+        generic_keep_keys = {"highway": str, "width": float}
+        generic_defaults = {}
+        tags = {"highway": "footway", "width": '1.525'}
+        normalizer = _normalize(tags, generic_keep_keys, generic_defaults)
+        self.assertIsInstance(normalizer, dict)
+        self.assertIn('highway', normalizer)
+        self.assertIn('width', normalizer)
+        self.assertEqual(normalizer['width'], 1.525)
+
 
 
 if __name__ == '__main__':
