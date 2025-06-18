@@ -3,12 +3,21 @@ import re
 import json
 import asyncio
 import unittest
+import math
 from src.osm_osw_reformatter.osm2osw.osm2osw import OSM2OSW
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(ROOT_DIR)), 'output')
 TEST_FILE = os.path.join(ROOT_DIR, 'test_files/wa.microsoft.osm.pbf')
+TEST_WIDTH_FILE = os.path.join(ROOT_DIR, 'test_files/width-test.xml')
 
+
+def is_valid_float(value):
+    try:
+        f = float(value)
+        return not math.isnan(f)
+    except (ValueError, TypeError):
+        return False
 
 class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
     def test_convert_successful(self):
@@ -31,6 +40,32 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
             result = await osm2osw.convert()
             self.assertEqual(len(result.generated_files), 4)
             for file in result.generated_files:
+                os.remove(file)
+
+        asyncio.run(run_test())
+
+    def test_generated_with_valid_width_tag(self):
+        osm_file_path = TEST_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
+            result = await osm2osw.convert()
+
+            self.assertEqual(len(result.generated_files), 4)
+
+            for file in result.generated_files:
+                if file.endswith('.geojson'):
+                    with open(file, 'r') as f:
+                        geojson = json.load(f)
+                        for feature in geojson.get("features", []):
+                            props = feature.get("properties", {})
+                            if "width" in props:
+                                width_val = props["width"]
+                                self.assertTrue(
+                                    is_valid_float(width_val),
+                                    msg=f"Invalid width value '{width_val}' in file {file}"
+                                )
+
                 os.remove(file)
 
         asyncio.run(run_test())
@@ -138,7 +173,6 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
                 os.remove(file_path)
 
         asyncio.run(run_test())
-
 
     def test_no_empty_features(self):
         osm_file_path = TEST_FILE

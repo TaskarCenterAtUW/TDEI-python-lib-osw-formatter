@@ -9,6 +9,24 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         "living_street"
     )
 
+    OSM_TAG_DATATYPES = {
+        'width': float,
+        'step_count': int,
+    }
+
+    def _check_datatypes(self, tags):
+        for key, expected_type in self.OSM_TAG_DATATYPES.items():
+            value = tags.get(key)
+            if value is not None:
+                try:
+                    cast_value = expected_type(value)
+                    if isinstance(cast_value, float) and (cast_value != cast_value):  # NaN check
+                        tags.pop(key)
+                    else:
+                        tags[key] = str(cast_value)
+                except (ValueError, TypeError):
+                    tags.pop(key)
+
     def filter_tags(self, tags):
         '''
         Override this method if you want to modify or add tags to the xml output
@@ -29,6 +47,8 @@ class OSMNormalizer(ogr2osm.TranslationBase):
 
         # OSW fields with similar OSM field names
         tags['incline'] = tags.pop('climb', '')
+
+        self._check_datatypes(tags)
 
         return tags
 
