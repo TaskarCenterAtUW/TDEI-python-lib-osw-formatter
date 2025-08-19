@@ -1,0 +1,5 @@
+- uses: github/codeql-action/init@v3
+  with:
+    config-file: ./.github/codeql/codeql-config.yml
+    matrix:
+      language: ['python']
