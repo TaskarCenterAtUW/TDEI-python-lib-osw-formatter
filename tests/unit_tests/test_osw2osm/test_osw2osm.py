@@ -88,6 +88,22 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
         os.remove(result.generated_files)
 
+    def test_incline_tags_have_climb(self):
+        zip_file = TEST_ZIP_FILE
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        result = osw2osm.convert()
+        xml_file_path = result.generated_files
+
+        tree = ET.parse(xml_file_path)
+        root = tree.getroot()
+
+        for element in root.findall('.//way') + root.findall('.//node') + root.findall('.//relation'):
+            tags = {tag.get('k'): tag.get('v') for tag in element.findall('tag')}
+            if 'incline' in tags:
+                self.assertIn('climb', tags)
+
+        os.remove(result.generated_files)
+
 
 if __name__ == '__main__':
     unittest.main()

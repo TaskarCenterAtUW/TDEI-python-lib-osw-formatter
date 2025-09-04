@@ -72,3 +72,21 @@ class TestOSMNormalizeInclineField(unittest.TestCase):
         normalizer = self.normalizer.filter_tags(tags)
         self.assertEqual(normalizer["climb"], "down")
         self.assertEqual(normalizer["incline"], "-0.014")
+
+    def test_does_not_derive_climb_from_zero_incline(self):
+        tags = {"highway": "footway", "incline": 0}
+        normalizer = self.normalizer.filter_tags(tags)
+        self.assertEqual(normalizer["incline"], "0.0")
+        self.assertNotIn("climb", normalizer)
+
+    def test_retains_climb_without_incline(self):
+        tags = {"highway": "footway", "climb": "down"}
+        normalizer = self.normalizer.filter_tags(tags)
+        self.assertEqual(normalizer["climb"], "down")
+        self.assertNotIn("incline", normalizer)
+
+    def test_retains_non_numeric_incline_without_climb(self):
+        tags = {"highway": "footway", "incline": "steep"}
+        normalizer = self.normalizer.filter_tags(tags)
+        self.assertEqual(normalizer["incline"], "steep")
+        self.assertNotIn("climb", normalizer)
