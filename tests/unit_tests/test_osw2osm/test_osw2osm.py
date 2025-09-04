@@ -64,6 +64,30 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         result = osw2osm.convert()
         self.assertFalse(result.status)
 
+    def test_generated_file_contains_climb_tag(self):
+        zip_file = TEST_ZIP_FILE
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        result = osw2osm.convert()
+        xml_file_path = result.generated_files
+
+        tree = ET.parse(xml_file_path)
+        root = tree.getroot()
+        self.assertGreater(len(root.findall(".//tag[@k='climb']")), 0)
+
+        os.remove(result.generated_files)
+
+    def test_generated_file_contains_incline_tag(self):
+        zip_file = TEST_ZIP_FILE
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        result = osw2osm.convert()
+        xml_file_path = result.generated_files
+
+        tree = ET.parse(xml_file_path)
+        root = tree.getroot()
+        self.assertGreater(len(root.findall(".//tag[@k='incline']")), 0)
+
+        os.remove(result.generated_files)
+
 
 if __name__ == '__main__':
     unittest.main()

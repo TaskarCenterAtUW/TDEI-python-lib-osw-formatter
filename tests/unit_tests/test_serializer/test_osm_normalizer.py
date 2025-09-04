@@ -49,3 +49,26 @@ class TestOSMNormalizeWidthField(unittest.TestCase):
         self.assertIn('highway', normalizer)
         self.assertIn('width', normalizer)
         self.assertEqual(normalizer['width'], '1.525')
+
+
+class TestOSMNormalizeInclineField(unittest.TestCase):
+    def setUp(self):
+        self.normalizer = OSMNormalizer()
+
+    def test_retains_existing_incline_and_climb(self):
+        tags = {"highway": "footway", "incline": 0.014, "climb": "up"}
+        normalizer = self.normalizer.filter_tags(tags)
+        self.assertEqual(normalizer["incline"], "0.014")
+        self.assertEqual(normalizer["climb"], "up")
+
+    def test_derives_climb_from_positive_incline(self):
+        tags = {"highway": "footway", "incline": 0.014}
+        normalizer = self.normalizer.filter_tags(tags)
+        self.assertEqual(normalizer["climb"], "up")
+        self.assertEqual(normalizer["incline"], "0.014")
+
+    def test_derives_climb_from_negative_incline(self):
+        tags = {"highway": "footway", "incline": -0.014}
+        normalizer = self.normalizer.filter_tags(tags)
+        self.assertEqual(normalizer["climb"], "down")
+        self.assertEqual(normalizer["incline"], "-0.014")
