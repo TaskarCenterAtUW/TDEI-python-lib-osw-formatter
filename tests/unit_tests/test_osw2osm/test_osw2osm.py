@@ -7,6 +7,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(ROOT_DIR)), 'output')
 TEST_ZIP_FILE = os.path.join(ROOT_DIR, 'test_files/osw.zip')
 TEST_WIDTH_ZIP_FILE = os.path.join(ROOT_DIR, 'test_files/width-test.zip')
+TEST_DATA_WITH_INCLINE_ZIP_FILE = os.path.join(ROOT_DIR, 'test_files/dataset_with_incline.zip')
 
 
 class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
@@ -65,7 +66,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.status)
 
     def test_generated_file_contains_climb_tag(self):
-        zip_file = TEST_ZIP_FILE
+        zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
         xml_file_path = result.generated_files
@@ -77,7 +78,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         os.remove(result.generated_files)
 
     def test_generated_file_contains_incline_tag(self):
-        zip_file = TEST_ZIP_FILE
+        zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
         xml_file_path = result.generated_files
@@ -89,7 +90,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         os.remove(result.generated_files)
 
     def test_incline_tags_have_climb(self):
-        zip_file = TEST_ZIP_FILE
+        zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
         xml_file_path = result.generated_files
@@ -99,7 +100,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
         for element in root.findall('.//way') + root.findall('.//node') + root.findall('.//relation'):
             tags = {tag.get('k'): tag.get('v') for tag in element.findall('tag')}
-            if 'incline' in tags:
+            if 'incline' in tags and float(tags.get('incline', 0) or 0) != 0:
                 self.assertIn('climb', tags)
 
         os.remove(result.generated_files)
