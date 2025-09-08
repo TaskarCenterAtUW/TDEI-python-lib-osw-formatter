@@ -40,13 +40,23 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         tags.pop('_u_id', '')
         tags.pop('_v_id', '')
         tags.pop('_w_id', '')
-        tags.pop('incline', '')
         tags.pop('length', '')
         if 'foot' in tags and tags['foot'] == 'yes' and 'highway' in tags and tags['highway'] in self.OSM_IMPLIED_FOOTWAYS:
             tags.pop('foot', '')
 
         # OSW fields with similar OSM field names
-        tags['incline'] = tags.pop('climb', '')
+        if 'incline' in tags:
+            try:
+                incline_val = float(str(tags['incline']).rstrip('%'))
+            except (ValueError, TypeError):
+                incline_val = None
+            else:
+                tags['incline'] = str(incline_val)
+                if 'climb' not in tags:
+                    if incline_val > 0:
+                        tags['climb'] = 'up'
+                    elif incline_val < 0:
+                        tags['climb'] = 'down'
 
         self._check_datatypes(tags)
 
