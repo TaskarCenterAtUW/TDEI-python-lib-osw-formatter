@@ -1,4 +1,5 @@
 import os
+import json
 import zipfile
 import unittest
 from python_osw_validation import OSWValidation
@@ -28,7 +29,7 @@ class TestOSMCompliance(unittest.IsolatedAsyncioTestCase):
 
         validator = OSWValidation(zipfile_path=zip_path)
         result = validator.validate()
-        self.assertEqual(len(result.issues), 0, f'OSW Validation errors: {result.errors}')
+        self.assertEqual(len(result.issues), 0, f'OSW Validation issues: {json.dumps(result.issues)}')
 
         os.remove(osm_file)
         for f in osw_files:
