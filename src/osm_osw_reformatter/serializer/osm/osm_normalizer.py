@@ -45,8 +45,9 @@ class OSMNormalizer(ogr2osm.TranslationBase):
             tags.pop('foot', '')
 
         # OSW fields with similar OSM field names
-        if 'highway' in tags and tags['highway'] != 'steps':
-            tags.pop('climb', '')
+        if 'climb' in tags:
+            if tags.get('highway') != 'steps' or tags['climb'] not in ('up', 'down'):
+                tags.pop('climb', '')
 
         if 'incline' in tags:
             try:

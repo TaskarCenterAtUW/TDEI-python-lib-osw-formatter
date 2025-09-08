@@ -97,3 +97,14 @@ class TestOSMNormalizeInclineField(unittest.TestCase):
         self.assertIn("climb", normalizer)
         self.assertEqual(normalizer["climb"], "up")
         self.assertNotIn("incline", normalizer)
+
+    def test_retains_climb_down_when_highway_is_steps(self):
+        tags = {"highway": "steps", "climb": "down"}
+        normalizer = self.normalizer.filter_tags(tags)
+        self.assertIn("climb", normalizer)
+        self.assertEqual(normalizer["climb"], "down")
+
+    def test_discards_invalid_climb_when_highway_is_steps(self):
+        tags = {"highway": "steps", "climb": "sideways"}
+        normalizer = self.normalizer.filter_tags(tags)
+        self.assertNotIn("climb", normalizer)
