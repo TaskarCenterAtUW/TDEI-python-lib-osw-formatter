@@ -55,34 +55,34 @@ class TestOSMNormalizeInclineField(unittest.TestCase):
     def setUp(self):
         self.normalizer = OSMNormalizer()
 
-    def test_retains_existing_incline_and_climb(self):
+    def test_removes_existing_climb_and_retains_incline(self):
         tags = {"highway": "footway", "incline": 0.014, "climb": "up"}
         normalizer = self.normalizer.filter_tags(tags)
         self.assertEqual(normalizer["incline"], "0.014")
-        self.assertEqual(normalizer["climb"], "up")
+        self.assertNotIn("climb", normalizer)
 
-    def test_derives_climb_from_positive_incline(self):
+    def test_does_not_add_climb_from_positive_incline(self):
         tags = {"highway": "footway", "incline": 0.014}
         normalizer = self.normalizer.filter_tags(tags)
-        self.assertEqual(normalizer["climb"], "up")
+        self.assertNotIn("climb", normalizer)
         self.assertEqual(normalizer["incline"], "0.014")
 
-    def test_derives_climb_from_negative_incline(self):
+    def test_does_not_add_climb_from_negative_incline(self):
         tags = {"highway": "footway", "incline": -0.014}
         normalizer = self.normalizer.filter_tags(tags)
-        self.assertEqual(normalizer["climb"], "down")
+        self.assertNotIn("climb", normalizer)
         self.assertEqual(normalizer["incline"], "-0.014")
 
-    def test_does_not_derive_climb_from_zero_incline(self):
+    def test_does_not_add_climb_from_zero_incline(self):
         tags = {"highway": "footway", "incline": 0}
         normalizer = self.normalizer.filter_tags(tags)
         self.assertEqual(normalizer["incline"], "0.0")
         self.assertNotIn("climb", normalizer)
 
-    def test_retains_climb_without_incline(self):
+    def test_removes_climb_without_incline(self):
         tags = {"highway": "footway", "climb": "down"}
         normalizer = self.normalizer.filter_tags(tags)
-        self.assertEqual(normalizer["climb"], "down")
+        self.assertNotIn("climb", normalizer)
         self.assertNotIn("incline", normalizer)
 
     def test_retains_non_numeric_incline_without_climb(self):

@@ -45,18 +45,14 @@ class OSMNormalizer(ogr2osm.TranslationBase):
             tags.pop('foot', '')
 
         # OSW fields with similar OSM field names
+        tags.pop('climb', '')
         if 'incline' in tags:
             try:
                 incline_val = float(str(tags['incline']).rstrip('%'))
             except (ValueError, TypeError):
-                incline_val = None
+                pass
             else:
                 tags['incline'] = str(incline_val)
-                if 'climb' not in tags:
-                    if incline_val > 0:
-                        tags['climb'] = 'up'
-                    elif incline_val < 0:
-                        tags['climb'] = 'down'
 
         self._check_datatypes(tags)
 
