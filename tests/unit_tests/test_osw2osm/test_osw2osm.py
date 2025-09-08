@@ -65,7 +65,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         result = osw2osm.convert()
         self.assertFalse(result.status)
 
-    def test_generated_file_contains_climb_tag(self):
+    def test_generated_file_does_not_contain_climb_tag(self):
         zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
@@ -73,7 +73,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
         tree = ET.parse(xml_file_path)
         root = tree.getroot()
-        self.assertGreater(len(root.findall(".//tag[@k='climb']")), 0)
+        self.assertEqual(len(root.findall(".//tag[@k='climb']")), 0)
 
         os.remove(result.generated_files)
 
@@ -89,7 +89,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
         os.remove(result.generated_files)
 
-    def test_incline_tags_have_climb(self):
+    def test_incline_tags_do_not_have_climb(self):
         zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
@@ -101,7 +101,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         for element in root.findall('.//way') + root.findall('.//node') + root.findall('.//relation'):
             tags = {tag.get('k'): tag.get('v') for tag in element.findall('tag')}
             if 'incline' in tags and float(tags.get('incline', 0) or 0) != 0:
-                self.assertIn('climb', tags)
+                self.assertNotIn('climb', tags)
 
         os.remove(result.generated_files)
 
