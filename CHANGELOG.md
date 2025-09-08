@@ -1,8 +1,13 @@
 # Change log
 
+### 0.2.9
+- Retain existing `incline` and `climb` tags when converting OSW to OSM
+- Add `climb` tag when missing and `incline` is provided
+- Expanded unit tests for incline/climb handling
+
 ### 0.2.8
 - Fixed [BUG 2040](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/2040)
-- Removing the width tag if the width is not float or integer 
+- Removing the width tag if the width is not float or integer
 - Added unit test cases
 
 ### 0.2.7
