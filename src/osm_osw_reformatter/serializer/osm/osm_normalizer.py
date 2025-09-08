@@ -51,11 +51,11 @@ class OSMNormalizer(ogr2osm.TranslationBase):
 
         if 'incline' in tags:
             try:
-                incline_val = float(str(tags['incline']).rstrip('%'))
+                incline_val = float(str(tags['incline']))
             except (ValueError, TypeError):
                 pass
             else:
-                tags['incline'] = str(incline_val)
+                tags['incline'] = float(incline_val)
 
         self._check_datatypes(tags)
 

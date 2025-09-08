@@ -58,25 +58,25 @@ class TestOSMNormalizeInclineField(unittest.TestCase):
     def test_removes_existing_climb_and_retains_incline(self):
         tags = {"highway": "footway", "incline": 0.014, "climb": "up"}
         normalizer = self.normalizer.filter_tags(tags)
-        self.assertEqual(normalizer["incline"], "0.014")
+        self.assertEqual(normalizer["incline"], 0.014)
         self.assertNotIn("climb", normalizer)
 
     def test_does_not_add_climb_from_positive_incline(self):
         tags = {"highway": "footway", "incline": 0.014}
         normalizer = self.normalizer.filter_tags(tags)
         self.assertNotIn("climb", normalizer)
-        self.assertEqual(normalizer["incline"], "0.014")
+        self.assertEqual(normalizer["incline"], 0.014)
 
     def test_does_not_add_climb_from_negative_incline(self):
         tags = {"highway": "footway", "incline": -0.014}
         normalizer = self.normalizer.filter_tags(tags)
         self.assertNotIn("climb", normalizer)
-        self.assertEqual(normalizer["incline"], "-0.014")
+        self.assertEqual(normalizer["incline"], -0.014)
 
     def test_does_not_add_climb_from_zero_incline(self):
         tags = {"highway": "footway", "incline": 0}
         normalizer = self.normalizer.filter_tags(tags)
-        self.assertEqual(normalizer["incline"], "0.0")
+        self.assertEqual(normalizer["incline"], 0.0)
         self.assertNotIn("climb", normalizer)
 
     def test_removes_climb_without_incline(self):
