@@ -1,8 +1,7 @@
 import os
 import zipfile
 import unittest
-import subprocess
-import shutil
+from python_osw_validation import OSWValidation
 
 from src.osm_osw_reformatter.osw2osm.osw2osm import OSW2OSM
 from src.osm_osw_reformatter import Formatter
@@ -27,15 +26,12 @@ class TestOSMCompliance(unittest.IsolatedAsyncioTestCase):
             for f in osw_files:
                 zipf.write(f, os.path.basename(f))
 
-        validator = shutil.which('osw-validate')
-        if validator is None:
-            self.skipTest('python-osw-validation not installed')
-        proc = subprocess.run([validator, zip_path], capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0, f"Validator output: {proc.stdout}\n{proc.stderr}")
+        validator = OSWValidation(zipfile_path=zip_path)
+        result = validator.validate()
+        self.assertEqual(len(result.issues), 0, f'OSW Validation errors: {result.errors}')
 
         os.remove(osm_file)
         for f in osw_files:
             os.remove(f)
         os.remove(zip_path)
         formatter.cleanup()
-
