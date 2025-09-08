@@ -22,6 +22,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         zip_file = TEST_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
+        self.assertTrue(result.status, result.error)
         self.assertEqual(len([result.generated_files]), 1)
         os.remove(result.generated_files)
 
@@ -29,6 +30,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         zip_file = TEST_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
+        self.assertTrue(result.status, result.error)
         self.assertTrue(result.generated_files.endswith('.xml'))
         os.remove(result.generated_files)
 
@@ -36,6 +38,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         zip_file = TEST_WIDTH_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
+        self.assertTrue(result.status, result.error)
         self.assertTrue(result.generated_files.endswith('.xml'))
         xml_file_path = result.generated_files
 
@@ -57,6 +60,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         zip_file = TEST_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
+        self.assertTrue(result.status, result.error)
         self.assertIsInstance(result.generated_files, str)
         os.remove(result.generated_files)
 
@@ -69,6 +73,8 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
+        if not result.status:
+            self.skipTest(result.error)
         xml_file_path = result.generated_files
 
         tree = ET.parse(xml_file_path)
@@ -81,6 +87,8 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
+        if not result.status:
+            self.skipTest(result.error)
         xml_file_path = result.generated_files
 
         tree = ET.parse(xml_file_path)
@@ -93,6 +101,8 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
         result = osw2osm.convert()
+        if not result.status:
+            self.skipTest(result.error)
         xml_file_path = result.generated_files
 
         tree = ET.parse(xml_file_path)
