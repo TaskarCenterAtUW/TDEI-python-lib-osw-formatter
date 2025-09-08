@@ -1,5 +1,8 @@
 # Change log
 
+### 0.2.10
+- Removed `climb` tag generation from OSM normalizer
+
 ### 0.2.9
 - Retain existing `incline` and `climb` tags when converting OSW to OSM
 - Add `climb` tag when missing and `incline` is provided
