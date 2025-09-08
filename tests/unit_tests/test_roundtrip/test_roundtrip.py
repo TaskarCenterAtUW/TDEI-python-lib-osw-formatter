@@ -55,8 +55,7 @@ class TestRoundTrip(unittest.IsolatedAsyncioTestCase):
         # Start with a zipped OSW input, convert to OSM XML
         self.formatter = Formatter(workdir=OUTPUT_DIR, file_path=TEST_ZIP_FILE, prefix='test_roundtrip')
         convert = self.formatter.osw2osm()
-        if not convert.status:
-            self.skipTest(convert.error)
+        self.assertTrue(convert.status, convert.error)
         self.generated_osm_file = convert.generated_files
         print(self.generated_osm_file)
 
@@ -86,15 +85,13 @@ class TestRoundTrip(unittest.IsolatedAsyncioTestCase):
         # OSM XML → OSW (GeoJSON) → zip → OSM XML
         formatter = Formatter(workdir=OUTPUT_DIR, file_path=self.generated_osm_file, prefix='first_roundtrip_geojson')
         result = await formatter.osm2osw()
-        if not result.status:
-            self.skipTest(result.error)
+        self.assertTrue(result.status, result.error)
         generated_files = result.generated_files
         first_round_zip = generate_zip(generated_files)
 
         formatter = Formatter(workdir=OUTPUT_DIR, file_path=first_round_zip, prefix='second_roundtrip_xml')
         convert = formatter.osw2osm()
-        if not convert.status:
-            self.skipTest(convert.error)
+        self.assertTrue(convert.status, convert.error)
         generated_osm_file = convert.generated_files
 
         self.compare_osm_files(self.generated_osm_file, generated_osm_file)
@@ -126,15 +123,13 @@ class TestXMLRoundTrip(unittest.IsolatedAsyncioTestCase):
         # Start from OSM XML → OSW (GeoJSON) → zip → OSM XML
         formatter = Formatter(workdir=OUTPUT_DIR, file_path=TEST_XML_FILE, prefix='first_roundtrip_geojson')
         result = await formatter.osm2osw()
-        if not result.status:
-            self.skipTest(result.error)
+        self.assertTrue(result.status, result.error)
         generated_files = result.generated_files
         first_round_zip = generate_zip(generated_files)
 
         formatter = Formatter(workdir=OUTPUT_DIR, file_path=first_round_zip, prefix='second_roundtrip_xml')
         convert = formatter.osw2osm()
-        if not convert.status:
-            self.skipTest(convert.error)
+        self.assertTrue(convert.status, convert.error)
         generated_osm_file = convert.generated_files
 
         self.compare_osm_files(TEST_XML_FILE, generated_osm_file)

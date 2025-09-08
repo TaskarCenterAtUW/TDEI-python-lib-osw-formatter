@@ -16,14 +16,12 @@ class TestOSMCompliance(unittest.IsolatedAsyncioTestCase):
     async def test_output_is_osm_compliant(self):
         osw2osm = OSW2OSM(zip_file_path=TEST_DATA_WITH_INCLINE_ZIP_FILE, workdir=OUTPUT_DIR, prefix='compliance')
         result = osw2osm.convert()
-        if not result.status:
-            self.skipTest(result.error)
+        self.assertTrue(result.status, result.error)
         osm_file = result.generated_files
 
         formatter = Formatter(workdir=OUTPUT_DIR, file_path=osm_file, prefix='compliance')
         res = await formatter.osm2osw()
-        if not res.status:
-            self.skipTest(res.error)
+        self.assertTrue(res.status, res.error)
         osw_files = res.generated_files
 
         zip_path = os.path.join(OUTPUT_DIR, 'compliance_osw.zip')
