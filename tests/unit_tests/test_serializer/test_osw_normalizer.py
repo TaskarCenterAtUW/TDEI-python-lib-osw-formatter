@@ -1,6 +1,15 @@
 import unittest
-from src.osm_osw_reformatter.serializer.osw.osw_normalizer import OSWWayNormalizer, OSWNodeNormalizer, \
-    OSWPointNormalizer, tactile_paving, surface, crossing_markings, climb, _normalize
+from src.osm_osw_reformatter.serializer.osw.osw_normalizer import (
+    OSWWayNormalizer,
+    OSWNodeNormalizer,
+    OSWPointNormalizer,
+    tactile_paving,
+    surface,
+    crossing_markings,
+    climb,
+    incline,
+    _normalize,
+)
 
 
 class TestOSWWayNormalizer(unittest.TestCase):
@@ -51,6 +60,13 @@ class TestOSWWayNormalizer(unittest.TestCase):
         normalizer = OSWWayNormalizer(tags)
         result = normalizer.normalize()
         expected = {'highway': 'footway', 'footway': 'crossing', 'foot': 'yes'}
+        self.assertEqual(result, expected)
+
+    def test_normalize_incline(self):
+        tags = {'highway': 'footway', 'incline': '10%'}
+        normalizer = OSWWayNormalizer(tags)
+        result = normalizer.normalize()
+        expected = {'highway': 'footway', 'incline': 10.0, 'foot': 'yes'}
         self.assertEqual(result, expected)
 
     def test_normalize_invalid_way(self):
@@ -121,10 +137,15 @@ class TestCommonFunctions(unittest.TestCase):
         self.assertEqual(crossing_markings('dots', {'crossing:markings': 'dots'}), 'dots')
         self.assertIsNone(crossing_markings('invalid_value', {'crossing:markings': 'invalid_value'}))
 
-    def test_incline(self):
+    def test_climb(self):
         self.assertEqual(climb('up', {}), 'up')
         self.assertEqual(climb('down', {}), 'down')
         self.assertIsNone(climb('invalid_value', {}))
+
+    def test_incline(self):
+        self.assertEqual(incline('10%', {}), 10.0)
+        self.assertEqual(incline('0.5', {}), 0.5)
+        self.assertIsNone(incline('steep', {}))
 
 
 class TestNormalizeWidthField(unittest.TestCase):

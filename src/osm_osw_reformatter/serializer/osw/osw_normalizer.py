@@ -67,7 +67,7 @@ class OSWWayNormalizer:
             raise ValueError("This is an invalid way")
     
     def _normalize_way(self, keep_keys={}, defaults = {}):
-        generic_keep_keys = {"highway": str, "width": float, "surface": surface, "name": str, "description": str, "foot": foot}
+        generic_keep_keys = {"highway": str, "width": float, "surface": surface, "name": str, "description": str, "foot": foot, "incline": incline}
         generic_defaults = {}
         
         new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
@@ -81,7 +81,7 @@ class OSWWayNormalizer:
         return new_tags
     
     def _normalize_stairs(self, keep_keys = {}, defaults = {}):
-        generic_keep_keys = {"step_count": int, "incline": ["climb", climb]}
+        generic_keep_keys = {"step_count": int, "incline": incline}
         generic_defaults = {"foot": "yes"}
         
         new_tags = self._normalize_way({**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
@@ -584,13 +584,19 @@ def crossing_markings(tag_value, tags):
         return None
     
 def climb(tag_value, tags):
-    if tag_value.lower() not in (                        
+    if tag_value.lower() not in (
                                 "up",
                                 "down"
                                 ):
         return None
     else:
         return tag_value.lower()
+
+def incline(tag_value, tags):
+    try:
+        return float(str(tag_value).rstrip('%'))
+    except (ValueError, TypeError):
+        return None
     
 def foot(tag_value, tags):
     if tag_value.lower() not in (
