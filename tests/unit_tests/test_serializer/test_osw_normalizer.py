@@ -34,9 +34,19 @@ class TestOSWWayNormalizer(unittest.TestCase):
         self.assertTrue(normalizer.is_footway())
 
     def test_is_stairs(self):
-        tags = {'highway': 'steps'}
+        tags = {'highway': 'steps', 'climb': 'up'}
         normalizer = OSWWayNormalizer(tags)
         self.assertTrue(normalizer.is_stairs())
+
+    def test_is_stairs_invalid_climb(self):
+        tags = {'highway': 'steps', 'climb': 'left'}
+        normalizer = OSWWayNormalizer(tags)
+        self.assertFalse(normalizer.is_stairs())
+
+    def test_is_stairs_missing_climb(self):
+        tags = {'highway': 'steps'}
+        normalizer = OSWWayNormalizer(tags)
+        self.assertFalse(normalizer.is_stairs())
 
     def test_is_pedestrian(self):
         tags = {'highway': 'pedestrian'}
@@ -67,6 +77,20 @@ class TestOSWWayNormalizer(unittest.TestCase):
         normalizer = OSWWayNormalizer(tags)
         result = normalizer.normalize()
         expected = {'highway': 'footway', 'incline': 10.0, 'foot': 'yes'}
+        self.assertEqual(result, expected)
+
+    def test_normalize_length(self):
+        tags = {'highway': 'footway', 'length': '12'}
+        normalizer = OSWWayNormalizer(tags)
+        result = normalizer.normalize()
+        expected = {'highway': 'footway', 'length': 12.0, 'foot': 'yes'}
+        self.assertEqual(result, expected)
+
+    def test_normalize_stairs_keeps_climb(self):
+        tags = {'highway': 'steps', 'climb': 'down', 'step_count': '3'}
+        normalizer = OSWWayNormalizer(tags)
+        result = normalizer.normalize()
+        expected = {'highway': 'steps', 'climb': 'down', 'step_count': 3, 'foot': 'yes'}
         self.assertEqual(result, expected)
 
     def test_normalize_invalid_way(self):
