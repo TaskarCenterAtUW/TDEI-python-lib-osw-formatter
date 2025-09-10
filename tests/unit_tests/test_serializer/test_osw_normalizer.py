@@ -74,7 +74,7 @@ class TestOSWWayNormalizer(unittest.TestCase):
         self.assertEqual(result, expected)
 
     def test_normalize_incline(self):
-        tags = {'highway': 'footway', 'incline': '10%'}
+        tags = {'highway': 'footway', 'incline': '10'}
         normalizer = OSWWayNormalizer(tags)
         result = normalizer.normalize()
         expected = {'highway': 'footway', 'incline': 10.0, 'foot': 'yes'}
@@ -182,7 +182,7 @@ class TestCommonFunctions(unittest.TestCase):
         self.assertIsNone(climb('invalid_value', {}))
 
     def test_incline(self):
-        self.assertEqual(incline('10%', {}), 10.0)
+        self.assertEqual(incline('10', {}), 10.0)
         self.assertEqual(incline('0.5', {}), 0.5)
         self.assertIsNone(incline('steep', {}))
 

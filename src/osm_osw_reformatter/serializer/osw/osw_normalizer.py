@@ -605,7 +605,7 @@ def climb(tag_value, tags):
 
 def incline(tag_value, tags):
     try:
-        return float(str(tag_value).rstrip('%'))
+        return float(str(tag_value))
     except (ValueError, TypeError):
         return None
     
