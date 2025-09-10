@@ -91,21 +91,21 @@ class TestOSWWayNormalizer(unittest.TestCase):
         tags = {'highway': 'steps', 'climb': 'down', 'step_count': '3'}
         normalizer = OSWWayNormalizer(tags)
         result = normalizer.normalize()
-        expected = {'highway': 'steps', 'climb': 'down', 'step_count': 3}
+        expected = {'highway': 'steps', 'climb': 'down', 'step_count': 3, 'foot': 'yes'}
         self.assertEqual(result, expected)
 
     def test_normalize_stairs_defaults_highway_and_no_foot(self):
         tags = {'climb': 'up'}
         normalizer = OSWWayNormalizer(tags)
         result = normalizer._normalize_stairs()
-        expected = {'highway': 'steps', 'climb': 'up'}
+        expected = {'climb': 'up', 'foot': 'yes'}
         self.assertEqual(result, expected)
 
     def test_normalize_stairs_drops_invalid_climb(self):
         tags = {'highway': 'steps', 'climb': 'left'}
         normalizer = OSWWayNormalizer(tags)
         result = normalizer.normalize()
-        expected = {'highway': 'steps'}
+        expected = {'highway': 'steps', 'foot': 'yes'}
         self.assertEqual(result, expected)
 
     def test_normalize_invalid_way(self):

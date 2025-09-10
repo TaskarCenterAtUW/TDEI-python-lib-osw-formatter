@@ -96,7 +96,7 @@ class OSWWayNormalizer:
     
     def _normalize_stairs(self, keep_keys = {}, defaults = {}):
         generic_keep_keys = {"step_count": int, "climb": climb}
-        generic_defaults = {"highway": "steps"}
+        generic_defaults = {"foot": "yes"}
         
         new_tags = self._normalize_way({**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
         return new_tags
