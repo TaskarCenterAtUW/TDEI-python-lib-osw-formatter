@@ -95,8 +95,8 @@ class OSWWayNormalizer:
         return new_tags
     
     def _normalize_stairs(self, keep_keys = {}, defaults = {}):
-        generic_keep_keys = {"step_count": int, "climb": str}
-        generic_defaults = {"foot": "yes"}
+        generic_keep_keys = {"step_count": int, "climb": climb}
+        generic_defaults = {"highway": "steps"}
         
         new_tags = self._normalize_way({**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
         return new_tags
@@ -169,10 +169,7 @@ class OSWWayNormalizer:
         return (self.tags.get("highway", "") == "footway")
     
     def is_stairs(self):
-        return (
-            self.tags.get("highway", "") == "steps"
-            and self.tags.get("climb", "") in self.CLIMB_VALUES
-        )
+        return self.tags.get("highway", "") == "steps"
     
     def is_pedestrian(self):
         return self.tags.get("highway", "") == "pedestrian"
