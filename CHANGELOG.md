@@ -1,5 +1,10 @@
 # Change log
 
+### 0.2.11
+- Retain numeric `incline` values and new `length` tags during way normalization
+- Recognize any `highway=steps` way as stairs, preserving valid `climb` tags
+- Add compliance test verifying `incline` survives OSW→OSM→OSW roundtrips
+
 ### 0.2.10
 - Removed `climb` tag generation from OSM normalizer
 
