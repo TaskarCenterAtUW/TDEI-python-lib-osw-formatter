@@ -25,6 +25,7 @@ def _create_invalid_incline_zip(zip_path: str) -> str:
     Returns:
         The path to the generated ZIP archive.
     """
+    os.makedirs(os.path.dirname(zip_path), exist_ok=True)
     with zipfile.ZipFile(zip_path, 'w') as zf:
         zf.write(TEST_EDGES_WITH_INVALID_INCLINE_FILE, arcname='edges.geojson')
         zf.write(TEST_NODES_WITH_INVALID_INCLINE_FILE, arcname='nodes.geojson')
@@ -131,6 +132,9 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         zip_file = _create_invalid_incline_zip(zip_path)
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='invalid')
         result = osw2osm.convert()
+
+        # Ensure conversion succeeded so the XML file path is valid
+        self.assertTrue(result.status, msg=getattr(result, 'error', 'Conversion failed'))
         xml_file_path = result.generated_files
 
         tree = ET.parse(xml_file_path)
