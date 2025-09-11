@@ -36,3 +36,36 @@ class TestOSMCompliance(unittest.IsolatedAsyncioTestCase):
             os.remove(f)
         os.remove(zip_path)
         formatter.cleanup()
+
+    async def test_incline_tag_preserved(self):
+        osw2osm = OSW2OSM(
+            zip_file_path=TEST_DATA_WITH_INCLINE_ZIP_FILE,
+            workdir=OUTPUT_DIR,
+            prefix='incline'
+        )
+        result = osw2osm.convert()
+        osm_file = result.generated_files
+
+        formatter = Formatter(workdir=OUTPUT_DIR, file_path=osm_file, prefix='incline')
+        res = await formatter.osm2osw()
+        osw_files = res.generated_files
+
+        found_incline = False
+        for f in osw_files:
+            if f.endswith('.geojson'):
+                with open(f) as fh:
+                    data = json.load(fh)
+                    for feature in data.get('features', []):
+                        props = feature.get('properties', {})
+                        if 'incline' in props:
+                            found_incline = True
+                            break
+            if found_incline:
+                break
+
+        self.assertTrue(found_incline, 'No incline tag found in OSW output')
+
+        os.remove(osm_file)
+        for f in osw_files:
+            os.remove(f)
+        formatter.cleanup()
