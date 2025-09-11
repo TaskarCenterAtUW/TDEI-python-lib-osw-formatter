@@ -1,0 +1,12 @@
+{"type": "FeatureCollection", "features": [
+    {
+        "type": "Feature",
+        "geometry": {"type": "LineString", "coordinates": [[0.0, 0.0], [0.0, 1.0]]},
+        "properties": {"_id": "1", "_u_id": "1", "_v_id": "2", "highway": "footway", "foot": "yes", "incline": 0.1}
+    },
+    {
+        "type": "Feature",
+        "geometry": {"type": "LineString", "coordinates": [[0.0, 1.0], [0.0, 2.0]]},
+        "properties": {"_id": "2", "_u_id": "2", "_v_id": "3", "highway": "footway", "foot": "yes", "incline": "steep"}
+    }
+]}
