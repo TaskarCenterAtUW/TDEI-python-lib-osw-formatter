@@ -618,52 +618,61 @@ class OSMGraph:
         polygon_features = []
         for n, d in self.G.nodes(data=True):
             d_copy = {**d}
-            d_copy["_id"] = str(n)[1:]
-            d_copy['ext:osm_id'] = str(d_copy.get('osm_id', d_copy["_id"]))
+
+            node_id_str = str(n)
+            if isinstance(n, str) and node_id_str and node_id_str[0].isalpha():
+                stripped_id = node_id_str[1:]
+            else:
+                stripped_id = node_id_str
+
+            base_properties = {
+                "_id": stripped_id,
+                "ext:osm_id": str(d_copy.get("osm_id", stripped_id)),
+            }
+
+            geometry_obj = d_copy.pop("geometry", None)
+            if geometry_obj is None and "lon" in d_copy and "lat" in d_copy:
+                geometry_obj = Point(d_copy["lon"], d_copy["lat"])
+
+            if geometry_obj is None:
+                continue
+
+            geometry = mapping(geometry_obj)
+
+            d_copy.pop("lon", None)
+            d_copy.pop("lat", None)
 
             if OSWPointNormalizer.osw_point_filter(d):
-                geometry = mapping(d_copy.pop("geometry"))
-
-                if "lon" in d_copy:
-                    d_copy.pop("lon")
-
-                if "lat" in d_copy:
-                    d_copy.pop("lat")
+                normalized_props = OSWPointNormalizer(d).normalize()
+                properties = {**normalized_props, **base_properties}
 
                 point_features.append(
-                    {"type": "Feature", "geometry": geometry, "properties": d_copy}
+                    {"type": "Feature", "geometry": geometry, "properties": properties}
                 )
             elif OSWLineNormalizer.osw_line_filter(d):
-                geometry = mapping(d_copy.pop("geometry"))
+                properties = {**d_copy, **base_properties}
 
                 line_features.append(
-                    {"type": "Feature", "geometry": geometry, "properties": d_copy}
+                    {"type": "Feature", "geometry": geometry, "properties": properties}
                 )
             elif OSWZoneNormalizer.osw_zone_filter(d):
-                geometry = mapping(d_copy.pop("geometry"))
+                properties = {**d_copy, **base_properties}
 
                 zone_features.append(
-                    {"type": "Feature", "geometry": geometry, "properties": d_copy}
+                    {"type": "Feature", "geometry": geometry, "properties": properties}
                 )
             elif OSWPolygonNormalizer.osw_polygon_filter(d):
-                geometry = mapping(d_copy.pop("geometry"))
+                properties = {**d_copy, **base_properties}
 
                 polygon_features.append(
-                    {"type": "Feature", "geometry": geometry, "properties": d_copy}
+                    {"type": "Feature", "geometry": geometry, "properties": properties}
                 )
-            else:
-                d_copy['_id'] = str(n)
-
-                geometry = mapping(d_copy.pop('geometry'))
-
-                if 'lon' in d_copy:
-                    d_copy.pop('lon')
-
-                if 'lat' in d_copy:
-                    d_copy.pop('lat')
+            elif OSWNodeNormalizer.osw_node_filter(d):
+                normalized_props = OSWNodeNormalizer(d).normalize()
+                properties = {**normalized_props, **base_properties}
 
                 node_features.append(
-                    {'type': 'Feature', 'geometry': geometry, 'properties': d_copy}
+                    {"type": "Feature", "geometry": geometry, "properties": properties}
                 )
         nodes_fc = {**OSW_JSON_HEADER, **{"features": node_features}}
         points_fc = {**OSW_JSON_HEADER, **{"features": point_features}}
