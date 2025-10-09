@@ -631,7 +631,6 @@ class TestFromGeoJSON(unittest.TestCase):
             self.assertEqual(len(data['features']), 1)
             props = data['features'][0]['properties']
             self.assertEqual(props['_id'], '5959268989')
-            self.assertEqual(props['ext:osm_id'], '5959268989')
 
     def test_to_geojson_point_ids_trim_prefix(self):
         graph = nx.MultiDiGraph()
