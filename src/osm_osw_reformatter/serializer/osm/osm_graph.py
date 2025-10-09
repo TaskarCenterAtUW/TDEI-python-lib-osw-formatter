@@ -308,16 +308,30 @@ class OSMPolygonParser(osmium.SimpleHandler):
             exteriors_count = exteriors_count + 1
 
 class OSMTaggedNodeParser(osmium.SimpleHandler):
-    def __init__(self, G: nx.MultiDiGraph):
+    def __init__(self, G: nx.MultiDiGraph, node_filter: Optional[callable] = None,
+                 point_filter: Optional[callable] = None) -> None:
+
         osmium.SimpleHandler.__init__(self)
         self.G = G
+        self.node_filter = node_filter or (lambda tags: False)
+        self.point_filter = point_filter or (lambda tags: False)
 
     def node(self, n):
-        # Only add nodes with tags
-        if n.tags and len(n.tags) > 0:
-            d = dict(n.tags)
-            # Store OSM node id as string (to match the pattern in your output)
-            self.G.add_node(n.id, lon=n.location.lon, lat=n.location.lat, **d)
+        if not n.tags or len(n.tags) == 0:
+            return
+
+        tags = dict(n.tags)
+
+        if self.node_filter(tags):
+            normalized = OSWNodeNormalizer(tags).normalize()
+            if normalized:
+                self.G.add_node(n.id, lon=n.location.lon, lat=n.location.lat, **normalized)
+            return
+
+        if self.point_filter(tags):
+            normalized = OSWPointNormalizer(tags).normalize()
+            if normalized:
+                self.G.add_node("p" + str(n.id), lon=n.location.lon, lat=n.location.lat, **normalized)
 
 class OSMGraph:
     def __init__(self, G: nx.MultiDiGraph = None) -> None:
@@ -359,21 +373,21 @@ class OSMGraph:
         del line_parser
 
         # --- PATCH START: Add all loose/tagged nodes ---
-        tagged_node_parser = OSMTaggedNodeParser(G)
+        tagged_node_parser = OSMTaggedNodeParser(G, node_filter, point_filter)
         tagged_node_parser.apply_file(osm_file)
         G = tagged_node_parser.G
         del tagged_node_parser
         # --- PATCH END ---
 
-        # zone_parser = OSMZoneParser(G, zone_filter, progressbar=progressbar)
-        # zone_parser.apply_file(osm_file)
-        # G = zone_parser.G
-        # del zone_parser
+        zone_parser = OSMZoneParser(G, zone_filter, progressbar=progressbar)
+        zone_parser.apply_file(osm_file)
+        G = zone_parser.G
+        del zone_parser
 
-        # polygon_parser = OSMPolygonParser(G, polygon_filter, progressbar=progressbar)
-        # polygon_parser.apply_file(osm_file)
-        # G = polygon_parser.G
-        # del polygon_parser
+        polygon_parser = OSMPolygonParser(G, polygon_filter, progressbar=progressbar)
+        polygon_parser.apply_file(osm_file)
+        G = polygon_parser.G
+        del polygon_parser
 
         return OSMGraph(G)
 
@@ -618,10 +632,29 @@ class OSMGraph:
         polygon_features = []
         for n, d in self.G.nodes(data=True):
             d_copy = {**d}
-            d_copy["_id"] = str(n)[1:]
-            d_copy['ext:osm_id'] = str(d_copy.get('osm_id', d_copy["_id"]))
+            tags_only = {k: v for k, v in d.items() if k not in {"geometry", "lon", "lat"}}
 
-            if OSWPointNormalizer.osw_point_filter(d):
+            node_id_str = str(n)
+            if node_id_str and node_id_str[0].isalpha():
+                normalized_id = node_id_str[1:]
+            else:
+                normalized_id = node_id_str
+
+            d_copy["_id"] = normalized_id
+
+            osm_id_value = d_copy.pop('osm_id', None)
+            osm_id_str = None
+            if osm_id_value is not None:
+                osm_id_str = str(osm_id_value)
+                if osm_id_str and osm_id_str[0].isalpha():
+                    osm_id_str = osm_id_str[1:]
+
+            if osm_id_str and normalized_id.isdigit() and osm_id_str.isdigit() and len(osm_id_str) < len(normalized_id):
+                osm_id_str = normalized_id
+
+            d_copy['ext:osm_id'] = osm_id_str or normalized_id
+
+            if OSWPointNormalizer.osw_point_filter(tags_only):
                 geometry = mapping(d_copy.pop("geometry"))
 
                 if "lon" in d_copy:
@@ -633,19 +666,19 @@ class OSMGraph:
                 point_features.append(
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
                 )
-            elif OSWLineNormalizer.osw_line_filter(d):
+            elif OSWLineNormalizer.osw_line_filter(tags_only):
                 geometry = mapping(d_copy.pop("geometry"))
 
                 line_features.append(
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
                 )
-            elif OSWZoneNormalizer.osw_zone_filter(d):
+            elif OSWZoneNormalizer.osw_zone_filter(tags_only):
                 geometry = mapping(d_copy.pop("geometry"))
 
                 zone_features.append(
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
                 )
-            elif OSWPolygonNormalizer.osw_polygon_filter(d):
+            elif OSWPolygonNormalizer.osw_polygon_filter(tags_only):
                 geometry = mapping(d_copy.pop("geometry"))
 
                 polygon_features.append(

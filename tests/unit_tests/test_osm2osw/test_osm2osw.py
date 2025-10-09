@@ -33,13 +33,13 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
 
         asyncio.run(run_test())
 
-    def test_generated_3_files(self):
+    def test_generated_files(self):
         osm_file_path = TEST_FILE
 
         async def run_test():
             osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
             result = await osm2osw.convert()
-            self.assertEqual(len(result.generated_files), 4)
+            self.assertEqual(len(result.generated_files), 6)
             for file in result.generated_files:
                 os.remove(file)
 
@@ -52,7 +52,7 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
             osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
             result = await osm2osw.convert()
 
-            self.assertEqual(len(result.generated_files), 4)
+            self.assertEqual(len(result.generated_files), 6)
 
             for file in result.generated_files:
                 if file.endswith('.geojson'):
