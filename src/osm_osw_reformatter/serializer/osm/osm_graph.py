@@ -667,7 +667,7 @@ class OSMGraph:
                 polygon_features.append(
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
                 )
-            elif OSWNodeNormalizer.osw_node_filter(d) or self.G.degree(n) > 0:
+            else:
                 d_copy['_id'] = str(n)
 
                 geometry = mapping(d_copy.pop('geometry'))

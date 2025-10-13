@@ -11,6 +11,7 @@ OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(ROOT_DIR)), 'output')
 TEST_FILE = os.path.join(ROOT_DIR, 'test_files/wa.microsoft.osm.pbf')
 TEST_WIDTH_FILE = os.path.join(ROOT_DIR, 'test_files/width-test.xml')
 TEST_INCLINE_FILE = os.path.join(ROOT_DIR, 'test_files/incline-test.xml')
+TEST_INVALID_NODE_TAGS_FILE = os.path.join(ROOT_DIR, 'test_files/node_with_invalid_tags.xml')
 
 
 def is_valid_float(value):
@@ -243,6 +244,18 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
                 os.remove(file_path)
 
             self.assertTrue(found_incline, 'Incline tag not found in output edges')
+
+        asyncio.run(run_test())
+
+    def test_will_not_generate_nodes_file_if_node_with_invalid_tags(self):
+        osm_file_path = TEST_INVALID_NODE_TAGS_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
+            result = await osm2osw.convert()
+            self.assertEqual(len(result.generated_files), 0)
+            for file in result.generated_files:
+                os.remove(file)
 
         asyncio.run(run_test())
 
