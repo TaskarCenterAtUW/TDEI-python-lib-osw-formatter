@@ -51,17 +51,18 @@ class TestOSMCompliance(unittest.IsolatedAsyncioTestCase):
         osw_files = res.generated_files
 
         found_incline = False
-        for f in osw_files:
-            if f.endswith('.geojson'):
-                with open(f) as fh:
-                    data = json.load(fh)
-                    for feature in data.get('features', []):
-                        props = feature.get('properties', {})
-                        if 'incline' in props:
-                            found_incline = True
-                            break
-            if found_incline:
-                break
+        if osw_files:
+            for f in osw_files:
+                if f.endswith('.geojson'):
+                    with open(f) as fh:
+                        data = json.load(fh)
+                        for feature in data.get('features', []):
+                            props = feature.get('properties', {})
+                            if 'incline' in props:
+                                found_incline = True
+                                break
+                if found_incline:
+                    break
 
         self.assertTrue(found_incline, 'No incline tag found in OSW output')
 

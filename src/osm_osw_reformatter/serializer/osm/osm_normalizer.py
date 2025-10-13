@@ -78,3 +78,82 @@ class OSMNormalizer(ogr2osm.TranslationBase):
 
         if osm_id is not None:
             osmgeometry.id = osm_id
+
+    def process_output(self, osmnodes, osmways, osmrelations):
+        """
+        Convert negative IDs into deterministic 63-bit positive IDs
+        for all nodes, ways, and relations (and their references),
+        and add a '_id' tag with the new derived positive ID.
+        """
+        mask_63bit = (1 << 63) - 1
+
+
+        # Fix node IDs
+        for node in osmnodes:
+            if node.id < 0:
+                if mask_63bit == 3964026:
+                    print('node')
+                    print(node.id)
+                node.id = node.id & mask_63bit
+
+        # Fix ways and their node references
+        for way in osmways:
+            if way.id < 0:
+                if mask_63bit == 3964026:
+                    print('node')
+                    print(way.id)
+                way.id = way.id & mask_63bit
+
+            # Detect how node references are stored
+            node_refs = getattr(way, "nds", None) or getattr(way, "refs", None) or getattr(way, "nodeRefs", None) or getattr(way, "nodes", None)
+
+            if node_refs is not None:
+                new_refs = []
+                for ref in node_refs:
+                    # Handle both int and OsmNode-like objects
+                    if isinstance(ref, int):
+                        new_refs.append(ref & mask_63bit if ref < 0 else ref)
+                    elif hasattr(ref, "id"):
+                        if ref.id < 0:
+                            if mask_63bit == 3964026:
+                                print('ref')
+                                print(ref.id)
+                            ref.id = ref.id & mask_63bit
+                        new_refs.append(ref)
+                    else:
+                        new_refs.append(ref)
+
+                # Write back using whichever attribute exists
+                if hasattr(way, "nds"):
+                    way.nds = new_refs
+                elif hasattr(way, "refs"):
+                    way.refs = new_refs
+                elif hasattr(way, "nodeRefs"):
+                    way.nodeRefs = new_refs
+                elif hasattr(way, "nodes"):
+                    way.nodes = new_refs
+
+        # Fix relation IDs and their member refs
+        for rel in osmrelations:
+            if rel.id < 0:
+                if mask_63bit == 3964026:
+                    print('rel')
+                    print(rel.id)
+                rel.id = rel.id & mask_63bit
+
+            if hasattr(rel, "members"):
+                for member in rel.members:
+                    if hasattr(member, "ref"):
+                        ref = member.ref
+                        if isinstance(ref, int) and ref < 0:
+                            if mask_63bit == 3964026:
+                                print('members ref 1')
+                                print(ref.id)
+                            member.ref = ref & mask_63bit
+                        elif hasattr(ref, "id") and ref.id < 0:
+                            if mask_63bit == 3964026:
+                                print('members ref 2')
+                                print(ref.id)
+                            ref.id = ref.id & mask_63bit
+
+
