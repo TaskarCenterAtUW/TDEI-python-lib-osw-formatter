@@ -632,7 +632,9 @@ class OSMGraph:
         polygon_features = []
         for n, d in self.G.nodes(data=True):
             d_copy = {**d}
-            d_copy["_id"] = str(n)[1:]
+            id_str = str(n)
+            trimmed_id = id_str[1:] if isinstance(n, str) else id_str
+            d_copy["_id"] = trimmed_id
             d_copy['ext:osm_id'] = str(d_copy.get('osm_id', d_copy["_id"]))
 
             if OSWPointNormalizer.osw_point_filter(d):
@@ -665,7 +667,7 @@ class OSMGraph:
                 polygon_features.append(
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
                 )
-            else:
+            elif OSWNodeNormalizer.osw_node_filter(d) or self.G.degree(n) > 0:
                 d_copy['_id'] = str(n)
 
                 geometry = mapping(d_copy.pop('geometry'))

@@ -87,22 +87,46 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         """
         mask_63bit = (1 << 63) - 1
 
+        def _set_id_tag(osm_obj, new_id):
+            tags = getattr(osm_obj, "tags", None)
+            if tags is None or not hasattr(tags, "__setitem__"):
+                return
+
+            value = str(new_id)
+            existing = tags.get("_id") if hasattr(tags, "get") else None
+
+            if isinstance(existing, list):
+                tags["_id"] = [value]
+            elif existing is None:
+                # Determine if the container generally stores values as lists
+                sample_value = None
+                if hasattr(tags, "values"):
+                    for sample_value in tags.values():
+                        if sample_value is not None:
+                            break
+                if isinstance(sample_value, list):
+                    tags["_id"] = [value]
+                else:
+                    # Default to list storage to match ogr2osm's internal structures
+                    tags["_id"] = [value]
+            else:
+                tags["_id"] = value
+
+        def _normalise_id(osm_obj):
+            if osm_obj.id < 0:
+                new_id = osm_obj.id & mask_63bit
+                osm_obj.id = new_id
+                _set_id_tag(osm_obj, new_id)
+                return new_id
+            return osm_obj.id
 
         # Fix node IDs
         for node in osmnodes:
-            if node.id < 0:
-                if mask_63bit == 3964026:
-                    print('node')
-                    print(node.id)
-                node.id = node.id & mask_63bit
+            _normalise_id(node)
 
         # Fix ways and their node references
         for way in osmways:
-            if way.id < 0:
-                if mask_63bit == 3964026:
-                    print('node')
-                    print(way.id)
-                way.id = way.id & mask_63bit
+            _normalise_id(way)
 
             # Detect how node references are stored
             node_refs = getattr(way, "nds", None) or getattr(way, "refs", None) or getattr(way, "nodeRefs", None) or getattr(way, "nodes", None)
@@ -115,10 +139,8 @@ class OSMNormalizer(ogr2osm.TranslationBase):
                         new_refs.append(ref & mask_63bit if ref < 0 else ref)
                     elif hasattr(ref, "id"):
                         if ref.id < 0:
-                            if mask_63bit == 3964026:
-                                print('ref')
-                                print(ref.id)
                             ref.id = ref.id & mask_63bit
+                            _set_id_tag(ref, ref.id)
                         new_refs.append(ref)
                     else:
                         new_refs.append(ref)
@@ -136,24 +158,25 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         # Fix relation IDs and their member refs
         for rel in osmrelations:
             if rel.id < 0:
-                if mask_63bit == 3964026:
-                    print('rel')
-                    print(rel.id)
                 rel.id = rel.id & mask_63bit
+            _normalise_id(rel)
 
             if hasattr(rel, "members"):
                 for member in rel.members:
                     if hasattr(member, "ref"):
                         ref = member.ref
                         if isinstance(ref, int) and ref < 0:
-                            if mask_63bit == 3964026:
-                                print('members ref 1')
-                                print(ref.id)
                             member.ref = ref & mask_63bit
                         elif hasattr(ref, "id") and ref.id < 0:
-                            if mask_63bit == 3964026:
-                                print('members ref 2')
-                                print(ref.id)
                             ref.id = ref.id & mask_63bit
+                            _set_id_tag(ref, ref.id)
+
+        # Ensure deterministic ordering now that IDs have been normalised
+        if hasattr(osmnodes, "sort"):
+            osmnodes.sort(key=lambda n: n.id)
+        if hasattr(osmways, "sort"):
+            osmways.sort(key=lambda w: w.id)
+        if hasattr(osmrelations, "sort"):
+            osmrelations.sort(key=lambda r: r.id)
 
 

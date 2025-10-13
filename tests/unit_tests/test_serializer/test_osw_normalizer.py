@@ -73,6 +73,17 @@ class TestOSWWayNormalizer(unittest.TestCase):
         expected = {'highway': 'footway', 'footway': 'crossing', 'foot': 'yes'}
         self.assertEqual(result, expected)
 
+    def test_normalize_living_street_defaults_to_pedestrian_access(self):
+        tags = {'highway': 'living_street', 'width': '6.5'}
+        normalizer = OSWWayNormalizer(tags)
+
+        result = normalizer.normalize()
+
+        self.assertEqual(
+            result,
+            {'highway': 'living_street', 'width': 6.5, 'foot': 'yes'},
+        )
+
     def test_normalize_incline(self):
         tags = {'highway': 'footway', 'incline': '10'}
         normalizer = OSWWayNormalizer(tags)
