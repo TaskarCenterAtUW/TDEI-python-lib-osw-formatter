@@ -430,7 +430,7 @@ class OSWPolygonNormalizer:
         self.tags = tags
 
     def filter(self):
-        return (self.is_building())
+        return self.is_building()
     
     @staticmethod
     def osw_polygon_filter(tags):
@@ -457,7 +457,7 @@ class OSWZoneNormalizer:
         self.tags = tags
 
     def filter(self):
-        return (self.is_pedestrian())
+        return self.is_pedestrian()
     
     @staticmethod
     def osw_zone_filter(tags):

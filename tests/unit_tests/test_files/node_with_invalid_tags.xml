@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version='0.6' generator='JOSM'>
+<node id='565516917' timestamp='2018-06-03T18:15:49Z' uid='5046269' user='Rich1234' visible='true' version='3' changeset='59515112' lat='38.8605033' lon='-77.0598865'>
+    <tag k='highway' v='traffic_signals' />
+    <tag k='source' v='survey' />
+  </node>
+</osm>
