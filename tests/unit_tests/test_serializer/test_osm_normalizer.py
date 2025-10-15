@@ -108,3 +108,45 @@ class TestOSMNormalizeInclineField(unittest.TestCase):
         tags = {"highway": "steps", "climb": "sideways"}
         normalizer = self.normalizer.filter_tags(tags)
         self.assertNotIn("climb", normalizer)
+
+
+class TestOSMProcessFeaturePost(unittest.TestCase):
+    class DummyGeometry:
+        def __init__(self, tags, osm_id=None):
+            self.tags = tags
+            self.id = osm_id
+
+    def setUp(self):
+        self.normalizer = OSMNormalizer()
+
+    def test_assigns_ext_osm_id_to_geometry(self):
+        geometry = self.DummyGeometry({"ext:osm_id": ["12345"]})
+
+        self.normalizer.process_feature_post(geometry, ogrfeature=None, ogrgeometry=None)
+
+        self.assertEqual(geometry.id, 12345)
+
+    def test_falls_back_to_internal_id_tag(self):
+        geometry = self.DummyGeometry({"_id": ["67890"]})
+
+        self.normalizer.process_feature_post(geometry, ogrfeature=None, ogrgeometry=None)
+
+        self.assertEqual(geometry.id, 67890)
+
+    def test_keeps_existing_id_when_no_tags_present(self):
+        geometry = self.DummyGeometry({}, osm_id=555)
+
+        self.normalizer.process_feature_post(geometry, ogrfeature=None, ogrgeometry=None)
+
+        self.assertEqual(geometry.id, 555)
+
+    def test_ignores_empty_ext_osm_id_values(self):
+        geometry = self.DummyGeometry({"ext:osm_id": [""], "_id": ["2468"]})
+
+        self.normalizer.process_feature_post(geometry, ogrfeature=None, ogrgeometry=None)
+
+        self.assertEqual(geometry.id, 2468)
+
+
+if __name__ == '__main__':
+    unittest.main()

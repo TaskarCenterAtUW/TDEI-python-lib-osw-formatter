@@ -1,12 +1,24 @@
 import os
 import json
 import unittest
+from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 import networkx as nx
 from shapely.geometry import LineString, Point, Polygon, mapping
-import json
-from src.osm_osw_reformatter.serializer.osm.osm_graph import OSMGraph, OSMWayParser, OSMNodeParser, OSMPointParser, \
-    OSMLineParser, OSMZoneParser, OSMPolygonParser
+from src.osm_osw_reformatter.serializer.osm.osm_graph import (
+    OSMGraph,
+    OSMWayParser,
+    OSMNodeParser,
+    OSMPointParser,
+    OSMLineParser,
+    OSMZoneParser,
+    OSMPolygonParser,
+    OSMTaggedNodeParser,
+)
+from src.osm_osw_reformatter.serializer.osw.osw_normalizer import (
+    OSWNodeNormalizer,
+    OSWPointNormalizer,
+)
 
 
 class TestOSMGraph(unittest.TestCase):
@@ -41,6 +53,70 @@ class TestOSMGraph(unittest.TestCase):
             list(filtered_graph.get_graph().edges(data=True))[0][2]["property"], "A"
         )
 
+    def test_node_adds_tagged_node_with_coordinates(self):
+        class DummyNode:
+            def __init__(self, node_id, tags, lon, lat):
+                self.id = node_id
+                self.tags = tags
+
+                class Location:
+                    def __init__(self, lon, lat):
+                        self.lon = lon
+                        self.lat = lat
+
+                self.location = Location(lon, lat)
+
+        tagged = DummyNode(101, {"highway": "footway"}, -122.3, 47.6)
+
+        self.osm_graph.node(tagged)
+
+        self.assertIn(101, self.mock_graph.nodes)
+        node_data = self.mock_graph.nodes[101]
+        self.assertEqual(node_data["highway"], "footway")
+        self.assertEqual(node_data["lon"], -122.3)
+        self.assertEqual(node_data["lat"], 47.6)
+
+    def test_node_skips_existing_identifiers(self):
+        self.mock_graph.add_node(202, lon=0.0, lat=0.0, name="original")
+
+        class DummyNode:
+            def __init__(self):
+                self.id = 202
+                self.tags = {"name": "replacement"}
+
+                class Location:
+                    lon = 1.0
+                    lat = 1.0
+
+                self.location = Location()
+
+        duplicate = DummyNode()
+
+        self.osm_graph.node(duplicate)
+
+        node_data = self.mock_graph.nodes[202]
+        self.assertEqual(node_data["name"], "original")
+        self.assertEqual(node_data["lon"], 0.0)
+        self.assertEqual(node_data["lat"], 0.0)
+
+    def test_node_requires_tags(self):
+        class DummyNode:
+            def __init__(self):
+                self.id = 303
+                self.tags = {}
+
+                class Location:
+                    lon = 2.0
+                    lat = 2.0
+
+                self.location = Location()
+
+        empty = DummyNode()
+
+        self.osm_graph.node(empty)
+
+        self.assertNotIn(303, self.mock_graph.nodes)
+
     @patch('src.osm_osw_reformatter.serializer.osm.osm_graph.mapping')
     def test_to_geojson(self, mock_mapping):
         # Mock mapping function to return a sample GeoJSON structure
@@ -54,10 +130,22 @@ class TestOSMGraph(unittest.TestCase):
 
         # Add a node and an edge with geometry to the graph
         self.mock_graph.add_node(
-            1, geometry=Point(1, 1), lon=1, lat=1, osm_id="test_node"
+            1,
+            geometry=Point(1, 1),
+            lon=1,
+            lat=1,
+            osm_id="test_node",
+            barrier="kerb",
+            kerb="flush",
         )
         self.mock_graph.add_node(
-            2, geometry=Point(2, 2), lon=2, lat=2, osm_id="test_node_2"
+            2,
+            geometry=Point(2, 2),
+            lon=2,
+            lat=2,
+            osm_id="test_node_2",
+            barrier="kerb",
+            kerb="lowered",
         )
         # Add an edge with geometry **and osm_id**
         self.mock_graph.add_edge(1, 2, geometry=LineString([(1, 1), (2, 2)]), osm_id="test_edge_1_2")
@@ -491,6 +579,124 @@ class TestFromGeoJSON(unittest.TestCase):
         self.assertIsNotNone(osm_graph, "OSMGraph object should not be None")
         self.assertEqual(len(osm_graph.get_graph().nodes), 1)
         self.assertEqual(len(osm_graph.get_graph().edges), 1)
+
+    def test_tagged_node_parser_skips_non_osw_nodes(self):
+        graph = nx.MultiDiGraph()
+        parser = OSMTaggedNodeParser(
+            graph,
+            OSWNodeNormalizer.osw_node_filter,
+            OSWPointNormalizer.osw_point_filter,
+        )
+
+        node_mock = MagicMock()
+        node_mock.tags = {
+            'highway': 'crossing',
+            'crossing:markings': 'zebra',
+            'tactile_paving': 'yes',
+        }
+        node_mock.id = 5959268989
+        node_mock.location = MagicMock(lon=-77.05091, lat=38.8598812)
+
+        parser.node(node_mock)
+
+        self.assertEqual(len(graph.nodes), 0)
+
+    def test_tagged_node_parser_adds_osw_nodes(self):
+        graph = nx.MultiDiGraph()
+        parser = OSMTaggedNodeParser(
+            graph,
+            OSWNodeNormalizer.osw_node_filter,
+            OSWPointNormalizer.osw_point_filter,
+        )
+
+        node_mock = MagicMock()
+        node_mock.tags = {
+            'barrier': 'kerb',
+            'kerb': 'flush',
+        }
+        node_mock.id = 123
+        node_mock.location = MagicMock(lon=-77.05091, lat=38.8598812)
+
+        parser.node(node_mock)
+
+        self.assertIn(123, graph.nodes)
+        self.assertEqual(graph.nodes[123]['barrier'], 'kerb')
+
+    def test_to_geojson_node_ids_preserved(self):
+        graph = nx.MultiDiGraph()
+        graph.add_node(
+            5959268989,
+            geometry=Point(-77.05091, 38.8598812),
+            lon=-77.05091,
+            lat=38.8598812,
+            barrier='kerb',
+            kerb='flush',
+        )
+
+        osm_graph = OSMGraph(G=graph)
+
+        with TemporaryDirectory() as tmpdir:
+            nodes_path = os.path.join(tmpdir, 'nodes.geojson')
+            edges_path = os.path.join(tmpdir, 'edges.geojson')
+            points_path = os.path.join(tmpdir, 'points.geojson')
+            lines_path = os.path.join(tmpdir, 'lines.geojson')
+            zones_path = os.path.join(tmpdir, 'zones.geojson')
+            polygons_path = os.path.join(tmpdir, 'polygons.geojson')
+
+            osm_graph.to_geojson(
+                nodes_path,
+                edges_path,
+                points_path,
+                lines_path,
+                zones_path,
+                polygons_path,
+            )
+
+            self.assertTrue(os.path.exists(nodes_path))
+
+            with open(nodes_path) as f:
+                data = json.load(f)
+
+            self.assertEqual(len(data['features']), 1)
+            props = data['features'][0]['properties']
+            self.assertEqual(props['_id'], '5959268989')
+
+    def test_to_geojson_point_ids_trim_prefix(self):
+        graph = nx.MultiDiGraph()
+        graph.add_node(
+            'p123',
+            geometry=Point(-77.05091, 38.8598812),
+            power='pole',
+        )
+
+        osm_graph = OSMGraph(G=graph)
+
+        with TemporaryDirectory() as tmpdir:
+            nodes_path = os.path.join(tmpdir, 'nodes.geojson')
+            edges_path = os.path.join(tmpdir, 'edges.geojson')
+            points_path = os.path.join(tmpdir, 'points.geojson')
+            lines_path = os.path.join(tmpdir, 'lines.geojson')
+            zones_path = os.path.join(tmpdir, 'zones.geojson')
+            polygons_path = os.path.join(tmpdir, 'polygons.geojson')
+
+            osm_graph.to_geojson(
+                nodes_path,
+                edges_path,
+                points_path,
+                lines_path,
+                zones_path,
+                polygons_path,
+            )
+
+            self.assertTrue(os.path.exists(points_path))
+
+            with open(points_path) as f:
+                data = json.load(f)
+
+            self.assertEqual(len(data['features']), 1)
+            props = data['features'][0]['properties']
+            self.assertEqual(props['_id'], '123')
+            self.assertEqual(props['ext:osm_id'], '123')
 
 
 

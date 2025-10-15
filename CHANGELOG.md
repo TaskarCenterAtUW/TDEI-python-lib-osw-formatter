@@ -1,5 +1,15 @@
 # Change log
 
+### 0.2.12
+- Updated OSMTaggedNodeParser to apply the OSW node and point filters with normalization before adding loose tagged nodes, ensuring non-compliant features like crossings are no longer emitted.
+- Extended serializer tests to cover the new tagged-node behavior, confirming that compliant kerb features are retained while schema-invalid crossings are skipped.
+- Updated GeoJSON node export to normalize IDs, retain full OSM identifiers, and skip non-OSW features so schema-invalid crossings are no longer emitted.
+- Ensured only synthetic node IDs have their prefix trimmed, fixing the prior bug where numeric IDs lost the leading digit and caused _id/ext:osm_id mismatches.
+- Expanded serializer tests to cover OSW-compliant node export, rejection of non-compliant crossings, and prefix handling for generated point IDs. 
+- Refined GeoJSON export to filter nodes using tag-only metadata, preventing schema-invalid features from being emitted.
+- Normalized ext:osm_id handling to preserve full numeric identifiers while trimming prefixed synthetic values.
+
+
 ### 0.2.11
 - Retain numeric `incline` values and new `length` tags during way normalization
 - Recognize any `highway=steps` way as stairs, preserving valid `climb` tags
