@@ -152,6 +152,19 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         os.remove(result.generated_files)
         os.remove(zip_file)
 
+    def test_osm_elements_have_version_attribute(self):
+        zip_file = TEST_WIDTH_ZIP_FILE
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='version')
+        result = osw2osm.convert()
+
+        tree = ET.parse(result.generated_files)
+        root = tree.getroot()
+
+        for element in root.findall('.//node') + root.findall('.//way') + root.findall('.//relation'):
+            self.assertEqual(element.get('version'), '1')
+
+        os.remove(result.generated_files)
+
 
 if __name__ == '__main__':
     unittest.main()

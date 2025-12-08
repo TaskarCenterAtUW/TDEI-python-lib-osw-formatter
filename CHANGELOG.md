@@ -1,5 +1,9 @@
 # Change log
 
+### 0.2.13
+- Added default `version="1"` attribute to all nodes, ways, and relations generated during OSW→OSM conversion.
+- Introduced unit test coverage to verify version attributes are written for all OSM elements.
+
 ### 0.2.12
 - Updated OSMTaggedNodeParser to apply the OSW node and point filters with normalization before adding loose tagged nodes, ensuring non-compliant features like crossings are no longer emitted.
 - Extended serializer tests to cover the new tagged-node behavior, confirming that compliant kerb features are retained while schema-invalid crossings are skipped.
