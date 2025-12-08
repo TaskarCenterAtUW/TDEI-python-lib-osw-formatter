@@ -6,7 +6,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 OUTPUT_DIR = f'{ROOT_DIR}/output'
 OSM_INPUT_FILE = f'{ROOT_DIR}/input/wedgewood_output.osm.pbf'
-OSW_INPUT_FILE = f'{ROOT_DIR}/input/osw.zip'
+OSW_INPUT_FILE = f'{ROOT_DIR}/input/wa.seattle.zip'
 
 is_exists = os.path.exists(OUTPUT_DIR)
 if not is_exists:
