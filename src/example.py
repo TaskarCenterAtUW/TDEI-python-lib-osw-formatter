@@ -6,7 +6,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 OUTPUT_DIR = f'{ROOT_DIR}/output'
 OSM_INPUT_FILE = f'{ROOT_DIR}/input/wedgewood_output.osm.pbf'
-OSW_INPUT_FILE = f'{ROOT_DIR}/input/wa.seattle.zip'
+OSW_INPUT_FILE = f'{ROOT_DIR}/input/osw.zip'
 
 is_exists = os.path.exists(OUTPUT_DIR)
 if not is_exists:
@@ -28,5 +28,5 @@ def osw_convert():
 
 
 if __name__ == '__main__':
-    asyncio.run(osm_convert())
+    # asyncio.run(osm_convert())
     osw_convert()

@@ -1,5 +1,6 @@
 import gc
 import ogr2osm
+from xml.etree import ElementTree as ET
 from pathlib import Path
 from ..helpers.osw import OSWHelper
 from ..helpers.response import Response
@@ -32,6 +33,7 @@ class OSW2OSM:
             # Instantiate either ogr2osm.OsmDataWriter or ogr2osm.PbfDataWriter
             data_writer = ogr2osm.OsmDataWriter(output_file, suppress_empty_tags=True)
             osm_data.output(data_writer)
+            self._ensure_version_attribute(output_file)
 
             del translation_object
             del datasource
@@ -46,3 +48,19 @@ class OSW2OSM:
         finally:
             gc.collect()
         return resp
+
+    @staticmethod
+    def _ensure_version_attribute(osm_xml_path: Path) -> None:
+        """Ensure nodes, ways, and relations include a version attribute."""
+        try:
+            tree = ET.parse(osm_xml_path)
+        except Exception:
+            return
+
+        root = tree.getroot()
+        for tag in ('node', 'way', 'relation'):
+            for element in root.findall(f'.//{tag}'):
+                if not element.get('version'):
+                    element.set('version', '1')
+
+        tree.write(osm_xml_path, encoding='utf-8', xml_declaration=True)
