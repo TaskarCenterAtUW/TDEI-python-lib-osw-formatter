@@ -10,11 +10,19 @@ spec.loader.exec_module(osw_normalizer)
 OSWWayNormalizer = osw_normalizer.OSWWayNormalizer
 OSWNodeNormalizer = osw_normalizer.OSWNodeNormalizer
 OSWPointNormalizer = osw_normalizer.OSWPointNormalizer
+OSWLineNormalizer = osw_normalizer.OSWLineNormalizer
+OSWPolygonNormalizer = osw_normalizer.OSWPolygonNormalizer
+OSWZoneNormalizer = osw_normalizer.OSWZoneNormalizer
 tactile_paving = osw_normalizer.tactile_paving
 surface = osw_normalizer.surface
 crossing_markings = osw_normalizer.crossing_markings
 climb = osw_normalizer.climb
 incline = osw_normalizer.incline
+leaf_cycle = osw_normalizer.leaf_cycle
+leaf_type = osw_normalizer.leaf_type
+natural_point = osw_normalizer.natural_point
+natural_line = osw_normalizer.natural_line
+natural_polygon = osw_normalizer.natural_polygon
 _normalize = osw_normalizer._normalize
 
 
@@ -125,6 +133,12 @@ class TestOSWWayNormalizer(unittest.TestCase):
         with self.assertRaises(ValueError):
             normalizer.normalize()
 
+    def test_osw_way_filter_helper(self):
+        tags = {'highway': 'footway', 'footway': 'sidewalk'}
+        self.assertTrue(OSWWayNormalizer.osw_way_filter(tags))
+        tags = {'highway': 'motorway'}
+        self.assertFalse(OSWWayNormalizer.osw_way_filter(tags))
+
 
 class TestOSWNodeNormalizer(unittest.TestCase):
     def test_is_kerb(self):
@@ -169,6 +183,79 @@ class TestOSWPointNormalizer(unittest.TestCase):
         expected = {'power': 'pole'}
         self.assertEqual(result, expected)
 
+    def test_normalize_fire_hydrant(self):
+        tags = {'emergency': 'fire_hydrant', 'name': 'Hydrant 42'}
+        normalizer = OSWPointNormalizer(tags)
+        result = normalizer.normalize()
+        expected = {'emergency': 'fire_hydrant'}
+        self.assertEqual(result, expected)
+
+    def test_invalid_point_is_logged_and_skipped(self):
+        tags = {'amenity': 'unknown'}
+        normalizer = OSWPointNormalizer(tags)
+        result = normalizer.normalize()
+        self.assertEqual(result, {})
+
+    def test_is_tree(self):
+        tags = {'natural': 'tree'}
+        normalizer = OSWPointNormalizer(tags)
+        self.assertTrue(normalizer.is_tree())
+
+    def test_normalize_tree(self):
+        tags = {'natural': 'tree', 'leaf_cycle': 'Deciduous', 'leaf_type': 'needleLeaved'}
+        normalizer = OSWPointNormalizer(tags)
+        result = normalizer.normalize()
+        expected = {'natural': 'tree', 'leaf_cycle': 'deciduous', 'leaf_type': 'needleleaved'}
+        self.assertEqual(result, expected)
+
+
+class TestOSWLineNormalizer(unittest.TestCase):
+    def test_is_tree_row(self):
+        tags = {'natural': 'tree_row'}
+        normalizer = OSWLineNormalizer(tags)
+        self.assertTrue(normalizer.is_tree_row())
+
+    def test_normalize_tree_row(self):
+        tags = {'natural': 'tree_row', 'leaf_cycle': 'evergreen', 'leaf_type': 'leafless'}
+        normalizer = OSWLineNormalizer(tags)
+        result = normalizer.normalize()
+        expected = {'natural': 'tree_row', 'leaf_cycle': 'evergreen', 'leaf_type': 'leafless'}
+        self.assertEqual(result, expected)
+
+    def test_invalid_line_raises(self):
+        tags = {'barrier': 'wall'}
+        normalizer = OSWLineNormalizer(tags)
+        with self.assertRaises(ValueError):
+            normalizer.normalize()
+
+
+class TestOSWPolygonNormalizer(unittest.TestCase):
+    def test_is_wood(self):
+        tags = {'natural': 'wood'}
+        normalizer = OSWPolygonNormalizer(tags)
+        self.assertTrue(normalizer.is_wood())
+
+    def test_normalize_wood(self):
+        tags = {'natural': 'wood', 'leaf_cycle': 'mixed', 'leaf_type': 'broadleaved'}
+        normalizer = OSWPolygonNormalizer(tags)
+        result = normalizer.normalize()
+        expected = {'natural': 'wood', 'leaf_cycle': 'mixed', 'leaf_type': 'broadleaved'}
+        self.assertEqual(result, expected)
+
+    def test_invalid_polygon_raises(self):
+        tags = {'natural': 'meadow'}
+        normalizer = OSWPolygonNormalizer(tags)
+        with self.assertRaises(ValueError):
+            normalizer.normalize()
+
+
+class TestOSWZoneNormalizer(unittest.TestCase):
+    def test_invalid_zone_raises(self):
+        tags = {'highway': 'residential'}
+        normalizer = OSWZoneNormalizer(tags)
+        with self.assertRaises(ValueError):
+            normalizer.normalize()
+
 
 class TestCommonFunctions(unittest.TestCase):
     def test_tactile_paving(self):
@@ -181,6 +268,9 @@ class TestCommonFunctions(unittest.TestCase):
         self.assertEqual(surface('asphalt', {}), 'asphalt')
         self.assertEqual(surface('concrete', {}), 'concrete')
         self.assertIsNone(surface('invalid_surface', {}))
+
+    def test_crossing_markings_from_zebra_crossing_tag(self):
+        self.assertEqual(crossing_markings('', {'crossing': 'zebra'}), 'zebra')
 
     def test_crossing_markings(self):
         self.assertEqual(crossing_markings('dashes', {'crossing:markings': 'dashes'}), 'dashes')
@@ -196,6 +286,31 @@ class TestCommonFunctions(unittest.TestCase):
         self.assertEqual(incline('10', {}), 10.0)
         self.assertEqual(incline('0.5', {}), 0.5)
         self.assertIsNone(incline('steep', {}))
+
+    def test_leaf_cycle(self):
+        self.assertEqual(leaf_cycle('Semi_deciduous', {}), 'semi_deciduous')
+        self.assertIsNone(leaf_cycle('unknown', {}))
+
+    def test_leaf_type(self):
+        self.assertEqual(leaf_type('BroadLeaved', {}), 'broadleaved')
+        self.assertIsNone(leaf_type('fake', {}))
+
+    def test_kerb(self):
+        self.assertEqual(osw_normalizer.kerb('flush', {}), 'flush')
+        self.assertIsNone(osw_normalizer.kerb('invalid', {}))
+
+    def test_foot(self):
+        self.assertEqual(osw_normalizer.foot('designated', {}), 'designated')
+        self.assertIsNone(osw_normalizer.foot('spaceship', {}))
+
+    def test_natural_point_invalid(self):
+        self.assertIsNone(natural_point('bush', {}))
+
+    def test_natural_line_invalid(self):
+        self.assertIsNone(natural_line('hedge', {}))
+
+    def test_natural_polygon_invalid(self):
+        self.assertIsNone(natural_polygon('meadow', {}))
 
 
 class TestNormalizeWidthField(unittest.TestCase):
@@ -253,6 +368,12 @@ class TestNormalizeWidthField(unittest.TestCase):
         self.assertIn('highway', normalizer)
         self.assertIn('width', normalizer)
         self.assertEqual(normalizer['width'], 1.525)
+
+    def test_normalize_sets_literal_defaults(self):
+        tags = {"foo": "bar"}
+        keep_keys = {"foo": ["ext:foo_copy", "bar"]}
+        result = _normalize(tags, keep_keys, {})
+        self.assertEqual(result.get("ext:foo_copy"), "bar")
 
 
 

@@ -1,3 +1,5 @@
+import json
+import math
 import ogr2osm
 
 class OSMNormalizer(ogr2osm.TranslationBase):
@@ -14,6 +16,73 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         'step_count': int,
     }
 
+    OSM_ALLOWED_TAGS = {
+        '_id',
+        '_u_id',
+        '_v_id',
+        '_w_id',
+        'area',
+        'amenity',
+        'barrier',
+        'building',
+        'climb',
+        'crossing:markings',
+        'description',
+        'emergency',
+        'ext:maxspeed',
+        'foot',
+        'footway',
+        'highway',
+        'incline',
+        'kerb',
+        'leaf_cycle',
+        'leaf_type',
+        'length',
+        'man_made',
+        'name',
+        'natural',
+        'opening_hours',
+        'power',
+        'service',
+        'step_count',
+        'surface',
+        'tactile_paving',
+        'width',
+    }
+
+    def _stash_ext(self, tags, key, value):
+        """Preserve non-compliant values under an ext: namespace."""
+        if value is None:
+            return
+        try:
+            if isinstance(value, (dict, list)):
+                safe_value = json.dumps(value, separators=(",", ": "))
+            elif isinstance(value, str):
+                # Normalize JSON-like strings to canonical compact form
+                stripped = value.strip()
+                if (stripped.startswith("{") and stripped.endswith("}")) or (
+                    stripped.startswith("[") and stripped.endswith("]")
+                ):
+                    try:
+                        safe_value = json.dumps(json.loads(stripped), separators=(",", ": "))
+                    except Exception:
+                        safe_value = value
+                else:
+                    safe_value = value
+            else:
+                safe_value = str(value)
+        except Exception:
+            safe_value = str(value)
+        # Final canonicalization for any JSON-like string
+        if isinstance(safe_value, str):
+            s = safe_value.strip()
+            if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+                try:
+                    safe_value = json.dumps(json.loads(s), separators=(",", ": "))
+                except Exception:
+                    pass
+        tags[f"ext:{key}"] = safe_value
+
     def _check_datatypes(self, tags):
         for key, expected_type in self.OSM_TAG_DATATYPES.items():
             value = tags.get(key)
@@ -21,16 +90,29 @@ class OSMNormalizer(ogr2osm.TranslationBase):
                 try:
                     cast_value = expected_type(value)
                     if isinstance(cast_value, float) and (cast_value != cast_value):  # NaN check
+                        self._stash_ext(tags, key, value)
                         tags.pop(key)
                     else:
                         tags[key] = str(cast_value)
                 except (ValueError, TypeError):
+                    self._stash_ext(tags, key, value)
                     tags.pop(key)
 
     def filter_tags(self, tags):
         '''
         Override this method if you want to modify or add tags to the xml output
         '''
+
+        # Promote non-serializable values (e.g., dict/list) to ext: namespace
+        for key in list(tags.keys()):
+            value = tags[key]
+            if isinstance(value, (dict, list)):
+                self._stash_ext(tags, key, value)
+                tags.pop(key, None)
+            elif key not in self.OSM_ALLOWED_TAGS and not key.startswith('ext:'):
+                # Preserve unknown/non-compliant fields as ext: tags
+                self._stash_ext(tags, key, value)
+                tags.pop(key, None)
 
         # Handle zones
         if 'highway' in tags and tags['highway'] == 'pedestrian' and '_w_id' in tags and tags['_w_id']:
@@ -47,13 +129,15 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         # OSW fields with similar OSM field names
         if 'climb' in tags:
             if tags.get('highway') != 'steps' or tags['climb'] not in ('up', 'down'):
+                self._stash_ext(tags, 'climb', tags.get('climb'))
                 tags.pop('climb', '')
 
         if 'incline' in tags:
             try:
                 incline_val = float(str(tags['incline']))
             except (ValueError, TypeError):
-                # Drop the incline tag if it cannot be interpreted as a float
+                # Preserve invalid incline as extension
+                self._stash_ext(tags, 'incline', tags.get('incline'))
                 tags.pop('incline', '')
             else:
                 # Normalise numeric incline values by casting to string
@@ -69,15 +153,76 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         ogr feature and ogr geometry used to create the object are passed as
         well. Note that any return values will be discarded by ogr2osm.
         '''
+        def _set_tag(osm_obj, key, value):
+            tags = getattr(osm_obj, "tags", None)
+            if tags is None:
+                return
+            if isinstance(tags.get(key), list):
+                tags[key] = [value]
+            elif key in tags:
+                tags[key] = value
+            else:
+                tags[key] = [value] if any(isinstance(v, list) for v in tags.values()) else value
+
         osm_id = None
         # ext:osm_id is probably in the tags dictionary as 'ext:osm_id' or similar
+        def _as_int(val):
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return None
+
         if 'ext:osm_id' in osmgeometry.tags and osmgeometry.tags['ext:osm_id'][0]:
-            osm_id = int(osmgeometry.tags['ext:osm_id'][0])
+            osm_id = _as_int(osmgeometry.tags['ext:osm_id'][0])
         elif '_id' in osmgeometry.tags and osmgeometry.tags['_id'][0]:
-            osm_id = int(osmgeometry.tags['_id'][0])
+            osm_id = _as_int(osmgeometry.tags['_id'][0])
 
         if osm_id is not None:
             osmgeometry.id = osm_id
+        elevation = self._extract_elevation(ogrgeometry)
+        if elevation is not None:
+            _set_tag(osmgeometry, "ext:elevation", str(elevation))
+
+    def _extract_elevation(self, ogrgeometry):
+        """Return the Z value of the first coordinate, if present and valid."""
+        if ogrgeometry is None:
+            return None
+
+        try:
+            dim = ogrgeometry.GetCoordinateDimension()
+            if dim < 3:
+                return None
+        except Exception:
+            return None
+
+        def _first_point(geom):
+            try:
+                if geom.GetPointCount() > 0:
+                    return geom.GetPoint(0)
+            except Exception:
+                pass
+            try:
+                if geom.GetGeometryCount() > 0:
+                    ref = geom.GetGeometryRef(0)
+                    if ref and ref.GetPointCount() > 0:
+                        return ref.GetPoint(0)
+            except Exception:
+                pass
+            return None
+
+        point = _first_point(ogrgeometry)
+        if not point or len(point) < 3:
+            return None
+
+        try:
+            z_val = float(point[2])
+        except (ValueError, TypeError):
+            return None
+
+        if math.isnan(z_val):
+            return None
+
+        return z_val
 
     def process_output(self, osmnodes, osmways, osmrelations):
         """
@@ -178,5 +323,3 @@ class OSMNormalizer(ogr2osm.TranslationBase):
             osmways.sort(key=lambda w: w.id)
         if hasattr(osmrelations, "sort"):
             osmrelations.sort(key=lambda r: r.id)
-
-

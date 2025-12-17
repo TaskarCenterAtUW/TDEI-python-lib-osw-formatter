@@ -1,6 +1,22 @@
 import types
 import math
-OSW_SCHEMA_ID = "https://sidewalks.washington.edu/opensidewalks/0.2/schema.json"
+
+OSW_SCHEMA_ID = "https://sidewalks.washington.edu/opensidewalks/0.3/schema.json"
+
+LEAF_CYCLE_VALUES = (
+    "deciduous",
+    "evergreen",
+    "mixed",
+    "semi_deciduous",
+    "semi_evergreen",
+)
+
+LEAF_TYPE_VALUES = (
+    "broadleaved",
+    "leafless",
+    "mixed",
+    "needleleaved",
+)
 
 class OSWWayNormalizer:
 
@@ -244,7 +260,8 @@ class OSWPointNormalizer:
             self.is_waste_basket()) or (
             self.is_manhole()) or (
             self.is_bollard()) or (
-            self.is_street_lamp())
+            self.is_street_lamp()) or (
+            self.is_tree())
     
     @staticmethod
     def osw_point_filter(tags):
@@ -263,6 +280,14 @@ class OSWPointNormalizer:
             return self._normalize_point({"barrier": str})
         elif self.is_street_lamp():
             return self._normalize_point({"highway": str})
+        elif self.is_tree():
+            return self._normalize_point(
+                {
+                    "natural": natural_point,
+                    "leaf_cycle": leaf_cycle,
+                    "leaf_type": leaf_type
+                }
+            )
         else:
             print(f"Invalid point skipped. Tags: {self.tags}")
             return {}
@@ -295,12 +320,15 @@ class OSWPointNormalizer:
     def is_street_lamp(self):
         return self.tags.get("highway", "") == "street_lamp"
     
+    def is_tree(self):
+        return self.tags.get("natural", "") == "tree"
+    
 class OSWLineNormalizer:
     def __init__(self, tags):
         self.tags = tags
 
     def filter(self):
-        return (self.is_fence())
+        return (self.is_fence()) or (self.is_tree_row())
     
     @staticmethod
     def osw_line_filter(tags):
@@ -309,6 +337,14 @@ class OSWLineNormalizer:
     def normalize(self):
         if self.is_fence():
             return self._normalize_line({"barrier": str})
+        elif self.is_tree_row():
+            return self._normalize_line(
+                {
+                    "natural": natural_line,
+                    "leaf_cycle": leaf_cycle,
+                    "leaf_type": leaf_type
+                }
+            )
         else:
             raise ValueError("This is an invalid line")
     
@@ -321,6 +357,9 @@ class OSWLineNormalizer:
     
     def is_fence(self):
         return self.tags.get("barrier", "") == "fence"
+    
+    def is_tree_row(self):
+        return self.tags.get("natural", "") == "tree_row"
     
 class OSWPolygonNormalizer:
     # Will be fetched from schema soon
@@ -430,7 +469,7 @@ class OSWPolygonNormalizer:
         self.tags = tags
 
     def filter(self):
-        return self.is_building()
+        return self.is_building() or self.is_wood()
     
     @staticmethod
     def osw_polygon_filter(tags):
@@ -438,7 +477,25 @@ class OSWPolygonNormalizer:
 
     def normalize(self):
         if self.is_building():
-            return self._normalize_polygon({"building": str, "name": str, "opening_hours": str})
+            return self._normalize_polygon(
+                {
+                    "building": str,
+                    "name": str,
+                    "opening_hours": str,
+                    "leaf_cycle": leaf_cycle,
+                    "leaf_type": leaf_type
+                }
+            )
+        elif self.is_wood():
+            return self._normalize_polygon(
+                {
+                    "natural": natural_polygon,
+                    "name": str,
+                    "opening_hours": str,
+                    "leaf_cycle": leaf_cycle,
+                    "leaf_type": leaf_type
+                }
+            )
         else:
             raise ValueError("This is an invalid polygon")
     
@@ -451,6 +508,9 @@ class OSWPolygonNormalizer:
     
     def is_building(self):
         return self.tags.get("building", "") in self.BUILDING_VALUES
+    
+    def is_wood(self):
+        return self.tags.get("natural", "") == "wood"
 
 class OSWZoneNormalizer:
     def __init__(self, tags):
@@ -538,6 +598,36 @@ def _normalize(tags, keep_keys, defaults):
     return {**{**new_tags, **defaults}, **{**new_tags, **ext_tags}}
 
     
+def leaf_cycle(tag_value, tags):
+    if tag_value.lower() not in LEAF_CYCLE_VALUES:
+        return None
+    return tag_value.lower()
+
+
+def leaf_type(tag_value, tags):
+    if tag_value.lower() not in LEAF_TYPE_VALUES:
+        return None
+    return tag_value.lower()
+
+
+def natural_point(tag_value, tags):
+    if tag_value.lower() != "tree":
+        return None
+    return "tree"
+
+
+def natural_line(tag_value, tags):
+    if tag_value.lower() != "tree_row":
+        return None
+    return "tree_row"
+
+
+def natural_polygon(tag_value, tags):
+    if tag_value.lower() != "wood":
+        return None
+    return "wood"
+
+
 def tactile_paving(tag_value, tags):
     if tag_value.lower() not in (
                                 "yes", 
