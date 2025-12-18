@@ -226,11 +226,14 @@ class OSMNormalizer(ogr2osm.TranslationBase):
 
     def process_output(self, osmnodes, osmways, osmrelations):
         """
-        Convert negative IDs into deterministic 63-bit positive IDs
-        for all nodes, ways, and relations (and their references),
-        and add a '_id' tag with the new derived positive ID.
+        Remap all element IDs to sequential, collision-free values per type.
+        Adds a '_id' tag with the new derived positive ID and rewrites
+        references accordingly.
         """
-        mask_63bit = (1 << 63) - 1
+        # Capture original IDs for mapping
+        node_id_map = {}
+        way_id_map = {}
+        rel_id_map = {}
 
         def _set_id_tag(osm_obj, new_id):
             tags = getattr(osm_obj, "tags", None)
@@ -257,40 +260,43 @@ class OSMNormalizer(ogr2osm.TranslationBase):
             else:
                 tags["_id"] = value
 
-        def _normalise_id(osm_obj):
-            if osm_obj.id < 0:
-                new_id = osm_obj.id & mask_63bit
-                osm_obj.id = new_id
-                _set_id_tag(osm_obj, new_id)
-                return new_id
-            return osm_obj.id
-
-        # Fix node IDs
+        # Remap node IDs sequentially starting at 1
         for node in osmnodes:
-            _normalise_id(node)
+            old_id = getattr(node, "id", None)
+            if old_id is None:
+                continue
+            new_id = len(node_id_map) + 1
+            node_id_map[old_id] = new_id
+            node.id = new_id
+            _set_id_tag(node, new_id)
 
-        # Fix ways and their node references
+        # Remap way IDs and rewrite node refs
         for way in osmways:
-            _normalise_id(way)
+            old_id = getattr(way, "id", None)
+            if old_id is not None:
+                new_id = len(way_id_map) + 1
+                way_id_map[old_id] = new_id
+                way.id = new_id
+                _set_id_tag(way, new_id)
 
-            # Detect how node references are stored
             node_refs = getattr(way, "nds", None) or getattr(way, "refs", None) or getattr(way, "nodeRefs", None) or getattr(way, "nodes", None)
-
             if node_refs is not None:
                 new_refs = []
                 for ref in node_refs:
-                    # Handle both int and OsmNode-like objects
                     if isinstance(ref, int):
-                        new_refs.append(ref & mask_63bit if ref < 0 else ref)
+                        if ref not in node_id_map:
+                            new_id = len(node_id_map) + 1
+                            node_id_map[ref] = new_id
+                        new_refs.append(node_id_map.get(ref, ref))
                     elif hasattr(ref, "id"):
-                        if ref.id < 0:
-                            ref.id = ref.id & mask_63bit
-                            _set_id_tag(ref, ref.id)
+                        if ref.id not in node_id_map:
+                            new_id = len(node_id_map) + 1
+                            node_id_map[ref.id] = new_id
+                        ref.id = node_id_map.get(ref.id, ref.id)
                         new_refs.append(ref)
                     else:
                         new_refs.append(ref)
 
-                # Write back using whichever attribute exists
                 if hasattr(way, "nds"):
                     way.nds = new_refs
                 elif hasattr(way, "refs"):
@@ -300,23 +306,32 @@ class OSMNormalizer(ogr2osm.TranslationBase):
                 elif hasattr(way, "nodes"):
                     way.nodes = new_refs
 
-        # Fix relation IDs and their member refs
+        # Remap relation IDs and member refs
         for rel in osmrelations:
-            if rel.id < 0:
-                rel.id = rel.id & mask_63bit
-            _normalise_id(rel)
+            old_id = getattr(rel, "id", None)
+            if old_id is not None:
+                new_id = len(rel_id_map) + 1
+                rel_id_map[old_id] = new_id
+                rel.id = new_id
+                _set_id_tag(rel, new_id)
 
             if hasattr(rel, "members"):
                 for member in rel.members:
-                    if hasattr(member, "ref"):
-                        ref = member.ref
-                        if isinstance(ref, int) and ref < 0:
-                            member.ref = ref & mask_63bit
-                        elif hasattr(ref, "id") and ref.id < 0:
-                            ref.id = ref.id & mask_63bit
-                            _set_id_tag(ref, ref.id)
+                    if not hasattr(member, "ref"):
+                        continue
+                    ref = member.ref
+                    if isinstance(ref, int):
+                        if ref not in node_id_map and ref not in way_id_map and ref not in rel_id_map:
+                            new_id = len(rel_id_map) + 1
+                            rel_id_map[ref] = new_id
+                        member.ref = node_id_map.get(ref, way_id_map.get(ref, rel_id_map.get(ref, ref)))
+                    elif hasattr(ref, "id"):
+                        if ref.id not in node_id_map and ref.id not in way_id_map and ref.id not in rel_id_map:
+                            new_id = len(rel_id_map) + 1
+                            rel_id_map[ref.id] = new_id
+                        ref.id = node_id_map.get(ref.id, way_id_map.get(ref.id, rel_id_map.get(ref.id, ref.id)))
 
-        # Ensure deterministic ordering now that IDs have been normalised
+        # Ensure deterministic ordering now that IDs have been remapped
         if hasattr(osmnodes, "sort"):
             osmnodes.sort(key=lambda n: n.id)
         if hasattr(osmways, "sort"):

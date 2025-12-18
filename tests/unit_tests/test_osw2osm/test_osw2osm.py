@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import tempfile
 import zipfile
 import unittest
 from src.osm_osw_reformatter.osw2osm.osw2osm import OSW2OSM
@@ -301,6 +302,69 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
         nodes_path = Path(os.path.dirname(zip_path)) / "nodes_3d.geojson"
         if nodes_path.exists():
             os.remove(nodes_path)
+
+    def test_ids_are_sequential_per_type(self):
+        zip_file = TEST_WIDTH_ZIP_FILE
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='sequential')
+        result = osw2osm.convert()
+
+        OSW2OSM._remap_ids_to_sequential(Path(result.generated_files))
+        tree = ET.parse(result.generated_files)
+        root = tree.getroot()
+
+        node_ids = sorted(int(n.get('id')) for n in root.findall('.//node'))
+        way_ids = sorted(int(w.get('id')) for w in root.findall('.//way'))
+        rel_ids = sorted(int(r.get('id')) for r in root.findall('.//relation'))
+
+        self.assertEqual(node_ids, list(range(1, len(node_ids) + 1)))
+        self.assertEqual(way_ids, list(range(1, len(way_ids) + 1)))
+        if rel_ids:
+            self.assertEqual(rel_ids, list(range(1, len(rel_ids) + 1)))
+
+        os.remove(result.generated_files)
+
+    def test_remap_ids_rewrites_refs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            xml_path = Path(tmpdir, "sample.osm.xml")
+            xml_path.write_text(
+                """<osm version="0.6">
+  <node id="10" lat="0" lon="0"><tag k="_id" v="10"/></node>
+  <node id="20" lat="1" lon="1"><tag k="_id" v="20"/></node>
+  <way id="30">
+    <nd ref="10"/><nd ref="20"/>
+    <tag k="_id" v="30"/>
+  </way>
+  <relation id="40">
+    <member type="node" ref="20" role=""/>
+    <member type="way" ref="30" role=""/>
+    <tag k="_id" v="40"/>
+  </relation>
+</osm>"""
+            )
+
+            OSW2OSM._remap_ids_to_sequential(xml_path)
+
+            root = ET.parse(xml_path).getroot()
+            node_ids = [n.get("id") for n in root.findall(".//node")]
+            way_ids = [w.get("id") for w in root.findall(".//way")]
+            rel_ids = [r.get("id") for r in root.findall(".//relation")]
+
+            self.assertEqual(node_ids, ["1", "2"])
+            self.assertEqual(way_ids, ["1"])
+            self.assertEqual(rel_ids, ["1"])
+
+            nd_refs = [nd.get("ref") for nd in root.findall(".//way/nd")]
+            self.assertEqual(nd_refs, ["1", "2"])
+
+            member_refs = [(m.get("type"), m.get("ref")) for m in root.findall(".//relation/member")]
+            self.assertEqual(member_refs, [("node", "2"), ("way", "1")])
+
+            node_tag_ids = [tag.get("v") for tag in root.findall(".//node/tag[@k='_id']")]
+            self.assertEqual(node_tag_ids, ["1", "2"])
+            way_tag_ids = [tag.get("v") for tag in root.findall(".//way/tag[@k='_id']")]
+            self.assertEqual(way_tag_ids, ["1"])
+            rel_tag_ids = [tag.get("v") for tag in root.findall(".//relation/tag[@k='_id']")]
+            self.assertEqual(rel_tag_ids, ["1"])
 
 
 if __name__ == '__main__':
