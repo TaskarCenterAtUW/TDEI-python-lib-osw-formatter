@@ -1,5 +1,20 @@
 # Change log
 
+### 0.3.0
+- Update converters to emit OSW 0.3 schema id and support new vegetation features (trees, tree rows, woods).
+- Extend OSW normalizers to keep `leaf_cycle` and `leaf_type` where allowed for points, lines, and polygons.
+- Add unit coverage for OSW 0.3 natural feature handling.
+- Expand OSM normalizer coverage and robustness: preserve non-compliant/unknown tags as `ext:*`, canonicalize JSON ext values, normalize elevation from 3D geometries, tolerate string IDs, and harden edge-case handling with tests.
+- OSW→OSM improvements: promote invalid/unknown fields (incl. dict/list) to `ext:*`, set `version="1"` for visible elements, derive `ext:elevation` from Z coords, and keep invalid incline/climb values under `ext:` instead of dropping them.
+- OSM→OSW improvements: verify OSW 0.3 `$schema` headers, export tree/tree_row/wood features, treat `ext:` tags as valid identifiers in OSW normalizers for filtering, and add multi-exterior handling tests for zones/polygons plus line parsing guards.
+- Added extensive unit tests for osm/osw normalizers and graph serializers (filters, geojson import/export, zebra crossing mapping, kerb/foot validators, invalid line/polygon/zone branches, ref normalization, etc.).
+- Added fixtures for vegetation and 3D elevation scenarios (`tree-test.xml`) and custom-property round-trip checks.
+- Implemented collision-free ID handling: sequential remapping of nodes/ways/relations on OSW→OSM export with reference rewrites, plus tests confirming sequential IDs and schema/tag updates.
+
+### 0.2.13
+- Added default `version="1"` attribute to all nodes, ways, and relations generated during OSW→OSM conversion.
+- Introduced unit test coverage to verify version attributes are written for all OSM elements.
+
 ### 0.2.12
 - Updated OSMTaggedNodeParser to apply the OSW node and point filters with normalization before adding loose tagged nodes, ensuring non-compliant features like crossings are no longer emitted.
 - Extended serializer tests to cover the new tagged-node behavior, confirming that compliant kerb features are retained while schema-invalid crossings are skipped.

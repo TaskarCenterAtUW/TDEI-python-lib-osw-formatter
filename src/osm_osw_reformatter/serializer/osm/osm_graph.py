@@ -730,3 +730,9 @@ class OSMGraph:
 
         for edge_feature in edges_fc['features']:
             props = edge_feature['properties']
+            u = props.pop('_u_id')
+            v = props.pop('_v_id')
+            props['geometry'] = shape(edge_feature['geometry'])
+            G.add_edges_from([(u, v, props)])
+
+        return osm_graph

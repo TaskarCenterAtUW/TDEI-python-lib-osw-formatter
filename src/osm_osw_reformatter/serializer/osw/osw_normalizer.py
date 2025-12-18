@@ -1,6 +1,29 @@
 import types
 import math
-OSW_SCHEMA_ID = "https://sidewalks.washington.edu/opensidewalks/0.2/schema.json"
+
+OSW_SCHEMA_ID = "https://sidewalks.washington.edu/opensidewalks/0.3/schema.json"
+
+LEAF_CYCLE_VALUES = (
+    "deciduous",
+    "evergreen",
+    "mixed",
+    "semi_deciduous",
+    "semi_evergreen",
+)
+
+LEAF_TYPE_VALUES = (
+    "broadleaved",
+    "leafless",
+    "mixed",
+    "needleleaved",
+)
+
+
+def _tag_value(tags, key):
+    if key in tags:
+        return tags.get(key, "")
+    return tags.get(f"ext:{key}", "")
+
 
 class OSWWayNormalizer:
 
@@ -151,49 +174,49 @@ class OSWWayNormalizer:
         return new_tags
 
     def is_sidewalk(self):
-        return (self.tags.get("highway", "") == "footway") and (
-            self.tags.get("footway", "") == "sidewalk"
+        return (_tag_value(self.tags, "highway") == "footway") and (
+            _tag_value(self.tags, "footway") == "sidewalk"
         )
 
     def is_crossing(self):
-        return (self.tags.get("highway", "") == "footway") and (
-            self.tags.get("footway", "") == "crossing"
+        return (_tag_value(self.tags, "highway") == "footway") and (
+            _tag_value(self.tags, "footway") == "crossing"
         )
     
     def is_traffic_island(self):
-        return (self.tags.get("highway", "") == "footway") and (
-            self.tags.get("footway", "") == "traffic_island"
+        return (_tag_value(self.tags, "highway") == "footway") and (
+            _tag_value(self.tags, "footway") == "traffic_island"
         )
 
     def is_footway(self):
-        return (self.tags.get("highway", "") == "footway")
+        return (_tag_value(self.tags, "highway") == "footway")
     
     def is_stairs(self):
-        return self.tags.get("highway", "") == "steps"
+        return _tag_value(self.tags, "highway") == "steps"
     
     def is_pedestrian(self):
-        return self.tags.get("highway", "") == "pedestrian"
+        return _tag_value(self.tags, "highway") == "pedestrian"
     
     def is_living_street(self):
-        return self.tags.get("highway", "") == "living_street"
+        return _tag_value(self.tags, "highway") == "living_street"
     
     def is_driveway(self):
-        return (self.tags.get("highway", "") == "service") and (
-            self.tags.get("service", "") == "driveway"
+        return (_tag_value(self.tags, "highway") == "service") and (
+            _tag_value(self.tags, "service") == "driveway"
         )
 
     def is_alley(self):
-        return (self.tags.get("highway", "") == "service") and (
-            self.tags.get("service", "") == "alley"
+        return (_tag_value(self.tags, "highway") == "service") and (
+            _tag_value(self.tags, "service") == "alley"
         )
     
     def is_parking_aisle(self):
-        return (self.tags.get("highway", "") == "service") and (
-            self.tags.get("service", "") == "parking_aisle"
+        return (_tag_value(self.tags, "highway") == "service") and (
+            _tag_value(self.tags, "service") == "parking_aisle"
         )
     
     def is_road(self):
-        return self.tags.get("highway", "") in self.ROAD_HIGHWAY_VALUES
+        return _tag_value(self.tags, "highway") in self.ROAD_HIGHWAY_VALUES
 
 class OSWNodeNormalizer:
     KERB_VALUES = ("flush", "lowered", "rolled", "raised")
@@ -229,8 +252,11 @@ class OSWNodeNormalizer:
         return new_tags
 
     def is_kerb(self):
-        return (self.tags.get("kerb", "") in self.KERB_VALUES) or (
-            self.tags.get("barrier", "") == "kerb" and ("kerb" not in self.tags or self.tags.get("kerb", "") == "yes")
+        kerb_value = _tag_value(self.tags, "kerb")
+        barrier_value = _tag_value(self.tags, "barrier")
+        has_kerb_key = "kerb" in self.tags or "ext:kerb" in self.tags
+        return (kerb_value in self.KERB_VALUES) or (
+            barrier_value == "kerb" and (not has_kerb_key or kerb_value == "yes")
         )
     
 class OSWPointNormalizer:
@@ -244,7 +270,8 @@ class OSWPointNormalizer:
             self.is_waste_basket()) or (
             self.is_manhole()) or (
             self.is_bollard()) or (
-            self.is_street_lamp())
+            self.is_street_lamp()) or (
+            self.is_tree())
     
     @staticmethod
     def osw_point_filter(tags):
@@ -263,6 +290,14 @@ class OSWPointNormalizer:
             return self._normalize_point({"barrier": str})
         elif self.is_street_lamp():
             return self._normalize_point({"highway": str})
+        elif self.is_tree():
+            return self._normalize_point(
+                {
+                    "natural": natural_point,
+                    "leaf_cycle": leaf_cycle,
+                    "leaf_type": leaf_type
+                }
+            )
         else:
             print(f"Invalid point skipped. Tags: {self.tags}")
             return {}
@@ -275,32 +310,35 @@ class OSWPointNormalizer:
         return new_tags
     
     def is_powerpole(self):
-        return self.tags.get("power", "") == "pole"
+        return _tag_value(self.tags, "power") == "pole"
     
     def is_firehydrant(self):
-        return self.tags.get("emergency", "") == "fire_hydrant"
+        return _tag_value(self.tags, "emergency") == "fire_hydrant"
     
     def is_bench(self):
-        return self.tags.get("amenity", "") == "bench"
+        return _tag_value(self.tags, "amenity") == "bench"
     
     def is_waste_basket(self):
-        return self.tags.get("amenity", "") == "waste_basket"
+        return _tag_value(self.tags, "amenity") == "waste_basket"
 
     def is_manhole(self):
-        return self.tags.get("man_made", "") == "manhole"
+        return _tag_value(self.tags, "man_made") == "manhole"
     
     def is_bollard(self):
-        return self.tags.get("barrier", "") == "bollard"
+        return _tag_value(self.tags, "barrier") == "bollard"
     
     def is_street_lamp(self):
-        return self.tags.get("highway", "") == "street_lamp"
+        return _tag_value(self.tags, "highway") == "street_lamp"
+    
+    def is_tree(self):
+        return _tag_value(self.tags, "natural") == "tree"
     
 class OSWLineNormalizer:
     def __init__(self, tags):
         self.tags = tags
 
     def filter(self):
-        return (self.is_fence())
+        return (self.is_fence()) or (self.is_tree_row())
     
     @staticmethod
     def osw_line_filter(tags):
@@ -309,6 +347,14 @@ class OSWLineNormalizer:
     def normalize(self):
         if self.is_fence():
             return self._normalize_line({"barrier": str})
+        elif self.is_tree_row():
+            return self._normalize_line(
+                {
+                    "natural": natural_line,
+                    "leaf_cycle": leaf_cycle,
+                    "leaf_type": leaf_type
+                }
+            )
         else:
             raise ValueError("This is an invalid line")
     
@@ -320,7 +366,10 @@ class OSWLineNormalizer:
         return new_tags
     
     def is_fence(self):
-        return self.tags.get("barrier", "") == "fence"
+        return _tag_value(self.tags, "barrier") == "fence"
+    
+    def is_tree_row(self):
+        return _tag_value(self.tags, "natural") == "tree_row"
     
 class OSWPolygonNormalizer:
     # Will be fetched from schema soon
@@ -430,7 +479,7 @@ class OSWPolygonNormalizer:
         self.tags = tags
 
     def filter(self):
-        return self.is_building()
+        return self.is_building() or self.is_wood()
     
     @staticmethod
     def osw_polygon_filter(tags):
@@ -438,7 +487,25 @@ class OSWPolygonNormalizer:
 
     def normalize(self):
         if self.is_building():
-            return self._normalize_polygon({"building": str, "name": str, "opening_hours": str})
+            return self._normalize_polygon(
+                {
+                    "building": str,
+                    "name": str,
+                    "opening_hours": str,
+                    "leaf_cycle": leaf_cycle,
+                    "leaf_type": leaf_type
+                }
+            )
+        elif self.is_wood():
+            return self._normalize_polygon(
+                {
+                    "natural": natural_polygon,
+                    "name": str,
+                    "opening_hours": str,
+                    "leaf_cycle": leaf_cycle,
+                    "leaf_type": leaf_type
+                }
+            )
         else:
             raise ValueError("This is an invalid polygon")
     
@@ -450,7 +517,10 @@ class OSWPolygonNormalizer:
         return new_tags
     
     def is_building(self):
-        return self.tags.get("building", "") in self.BUILDING_VALUES
+        return _tag_value(self.tags, "building") in self.BUILDING_VALUES
+    
+    def is_wood(self):
+        return _tag_value(self.tags, "natural") == "wood"
 
 class OSWZoneNormalizer:
     def __init__(self, tags):
@@ -477,7 +547,7 @@ class OSWZoneNormalizer:
         return new_tags
     
     def is_pedestrian(self):
-        return self.tags.get("highway", "") == "pedestrian"
+        return _tag_value(self.tags, "highway") == "pedestrian"
 
 
 def check_nan_and_raise(tag_type, temp):
@@ -538,6 +608,36 @@ def _normalize(tags, keep_keys, defaults):
     return {**{**new_tags, **defaults}, **{**new_tags, **ext_tags}}
 
     
+def leaf_cycle(tag_value, tags):
+    if tag_value.lower() not in LEAF_CYCLE_VALUES:
+        return None
+    return tag_value.lower()
+
+
+def leaf_type(tag_value, tags):
+    if tag_value.lower() not in LEAF_TYPE_VALUES:
+        return None
+    return tag_value.lower()
+
+
+def natural_point(tag_value, tags):
+    if tag_value.lower() != "tree":
+        return None
+    return "tree"
+
+
+def natural_line(tag_value, tags):
+    if tag_value.lower() != "tree_row":
+        return None
+    return "tree_row"
+
+
+def natural_polygon(tag_value, tags):
+    if tag_value.lower() != "wood":
+        return None
+    return "wood"
+
+
 def tactile_paving(tag_value, tags):
     if tag_value.lower() not in (
                                 "yes", 
