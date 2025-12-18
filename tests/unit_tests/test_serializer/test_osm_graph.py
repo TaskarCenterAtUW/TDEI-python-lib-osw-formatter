@@ -4,7 +4,7 @@ import unittest
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 import networkx as nx
-from shapely.geometry import LineString, Point, Polygon, mapping
+from shapely.geometry import LineString, Point, Polygon, mapping, shape
 from src.osm_osw_reformatter.serializer.osm.osm_graph import (
     OSMGraph,
     OSMWayParser,
@@ -52,6 +52,10 @@ class TestOSMGraph(unittest.TestCase):
         self.assertEqual(
             list(filtered_graph.get_graph().edges(data=True))[0][2]["property"], "A"
         )
+        # Node data copied
+        self.mock_graph.add_node(1, foo="bar")
+        filtered_graph = self.osm_graph.filter_edges(filter_func)
+        self.assertEqual(filtered_graph.get_graph().nodes[1].get("foo"), "bar")
 
     def test_node_adds_tagged_node_with_coordinates(self):
         class DummyNode:
@@ -188,6 +192,114 @@ class TestOSMGraph(unittest.TestCase):
         for path in [edges_path, nodes_path, points_path, lines_path, zones_path, polygons_path]:
             if os.path.exists(path):
                 os.remove(path)
+
+    def test_osm_line_parser_skips_invalid_locations(self):
+        G = nx.MultiDiGraph()
+        parser = OSMLineParser(G)
+
+        class DummyLoc:
+            def __init__(self, lon, lat, valid=True):
+                self.lon = lon
+                self.lat = lat
+                self._valid = valid
+
+            def valid(self):
+                return self._valid
+
+        class DummyNode:
+            def __init__(self, lon, lat, ref, valid=True):
+                self.location = DummyLoc(lon, lat, valid)
+                self.ref = ref
+                self.lon = lon
+                self.lat = lat
+
+        class DummyWay:
+            def __init__(self):
+                self.id = 1
+                self.tags = {"barrier": "fence"}
+                self.nodes = [
+                    DummyNode(0, 0, 10, valid=False),
+                    DummyNode(1, 1, 11, valid=True),
+                ]
+
+        parser.way(DummyWay())
+        self.assertIn("l1", G.nodes)
+        ndref = G.nodes["l1"]["ndref"]
+        self.assertEqual(len(ndref), 1)
+        self.assertEqual(ndref[0], [1.0, 1.0])
+
+    def test_osm_zone_parser_multiple_exteriors(self):
+        G = nx.MultiDiGraph()
+        parser = OSMZoneParser(G)
+
+        class DummyRing(list):
+            def __init__(self, coords):
+                super().__init__([self._node(i, c) for i, c in enumerate(coords)])
+
+            @staticmethod
+            def _node(idx, coord):
+                class Node:
+                    def __init__(self, idx, coord):
+                        self.ref = idx + 1000
+                        self.lon = coord[0]
+                        self.lat = coord[1]
+
+                return Node(idx, coord)
+
+        class DummyArea:
+            def __init__(self):
+                self.id = 5
+                self.tags = {"highway": "pedestrian"}
+                self._outers = [
+                    DummyRing([(0, 0), (1, 0), (1, 1)]),
+                    DummyRing([(2, 2), (3, 2), (3, 3)]),
+                ]
+
+            def outer_rings(self):
+                return self._outers
+
+            def inner_rings(self, exterior):
+                return []
+
+        parser.area(DummyArea())
+        self.assertIn("z5", G.nodes)
+        self.assertIn("z51", G.nodes)
+
+    def test_osm_polygon_parser_multiple_exteriors(self):
+        G = nx.MultiDiGraph()
+        parser = OSMPolygonParser(G)
+
+        class DummyRing(list):
+            def __init__(self, coords):
+                super().__init__([self._node(c) for c in coords])
+
+            @staticmethod
+            def _node(coord):
+                class Node:
+                    def __init__(self, coord):
+                        self.lon = coord[0]
+                        self.lat = coord[1]
+
+                return Node(coord)
+
+        class DummyArea:
+            def __init__(self):
+                self.id = 7
+                self.tags = {"building": "yes"}
+                self._outers = [
+                    DummyRing([(0, 0), (1, 0), (1, 1)]),
+                    DummyRing([(2, 2), (3, 2), (3, 3)]),
+                ]
+
+            def outer_rings(self):
+                return self._outers
+
+            def inner_rings(self, exterior):
+                return []
+
+        parser.area(DummyArea())
+        self.assertIn("g7", G.nodes)
+        self.assertIn("g71", G.nodes)
 
     def test_simplify(self):
         self.mock_graph.add_node(1)
@@ -697,6 +809,61 @@ class TestFromGeoJSON(unittest.TestCase):
             props = data['features'][0]['properties']
             self.assertEqual(props['_id'], '123')
             self.assertEqual(props['ext:osm_id'], '123')
+
+    def test_to_undirected_on_simple_graph(self):
+        g = nx.Graph()
+        g.add_edge(1, 2)
+        osm_graph = OSMGraph(G=g)
+        undirected = osm_graph.to_undirected()
+        self.assertIsInstance(undirected.get_graph(), nx.Graph)
+        self.assertFalse(undirected.get_graph().is_multigraph())
+
+    def test_filter_edges_preserves_node_attributes(self):
+        g = nx.MultiDiGraph()
+        g.add_node(1, keep=True, label="a")
+        g.add_node(2, keep=True, label="b")
+        g.add_edge(1, 2, keep=True)
+        osm_graph = OSMGraph(G=g)
+        filtered = osm_graph.filter_edges(lambda u, v, d: d.get("keep"))
+        self.assertIn(1, filtered.get_graph().nodes)
+        self.assertEqual(filtered.get_graph().nodes[1].get("label"), "a")
+
+    def test_from_geojson_reads_features(self):
+        with TemporaryDirectory() as tmpdir:
+            nodes_path = os.path.join(tmpdir, "nodes.geojson")
+            edges_path = os.path.join(tmpdir, "edges.geojson")
+
+            nodes_fc = {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {"type": "Point", "coordinates": [0, 0]},
+                        "properties": {"_id": "1", "name": "node1"},
+                    }
+                ],
+            }
+            edges_fc = {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {"type": "LineString", "coordinates": [[0, 0], [1, 1]]},
+                        "properties": {"_id": "e1", "_u_id": "1", "_v_id": "1", "highway": "footway"},
+                    }
+                ],
+            }
+
+            with open(nodes_path, "w") as f:
+                json.dump(nodes_fc, f)
+            with open(edges_path, "w") as f:
+                json.dump(edges_fc, f)
+
+            graph = OSMGraph.from_geojson(nodes_path, edges_path).get_graph()
+            self.assertIsInstance(graph, nx.MultiDiGraph)
+            self.assertIn("1", graph.nodes)
+            self.assertEqual(graph.nodes["1"]["name"], "node1")
+            self.assertEqual(len(list(graph.edges(data=True))), 1)
 
 
 

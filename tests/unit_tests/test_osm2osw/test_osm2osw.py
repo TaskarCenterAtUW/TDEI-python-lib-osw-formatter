@@ -5,6 +5,7 @@ import asyncio
 import unittest
 import math
 from src.osm_osw_reformatter.osm2osw.osm2osw import OSM2OSW
+from src.osm_osw_reformatter.serializer.osw.osw_normalizer import OSW_SCHEMA_ID
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(ROOT_DIR)), 'output')
@@ -12,6 +13,7 @@ TEST_FILE = os.path.join(ROOT_DIR, 'test_files/wa.microsoft.osm.pbf')
 TEST_WIDTH_FILE = os.path.join(ROOT_DIR, 'test_files/width-test.xml')
 TEST_INCLINE_FILE = os.path.join(ROOT_DIR, 'test_files/incline-test.xml')
 TEST_INVALID_NODE_TAGS_FILE = os.path.join(ROOT_DIR, 'test_files/node_with_invalid_tags.xml')
+TEST_TREE_FILE = os.path.join(ROOT_DIR, 'test_files/tree-test.xml')
 
 
 def is_valid_float(value):
@@ -214,6 +216,67 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
                         _id = feature["properties"].get("_id")
                         self.assertNotIn(_id, seen_ids, f"Duplicate _id: {_id} in {file_path}")
                         seen_ids.add(_id)
+
+            for file_path in result.generated_files:
+                os.remove(file_path)
+
+        asyncio.run(run_test())
+
+    def test_outputs_use_osw_03_schema(self):
+        osm_file_path = TEST_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='schema03')
+            result = await osm2osw.convert()
+            self.assertTrue(result.status)
+
+            for file_path in result.generated_files:
+                if file_path.endswith('.geojson'):
+                    with open(file_path) as f:
+                        data = json.load(f)
+                        self.assertEqual(data.get("$schema"), OSW_SCHEMA_ID)
+                os.remove(file_path)
+
+        asyncio.run(run_test())
+
+    def test_tree_coverage_emitted_under_osw_03(self):
+        osm_file_path = TEST_TREE_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='tree')
+            result = await osm2osw.convert()
+            self.assertTrue(result.status)
+
+            points = lines = polys = None
+            for file_path in result.generated_files:
+                if file_path.endswith('.graph.points.geojson'):
+                    points = file_path
+                elif file_path.endswith('.graph.lines.geojson'):
+                    lines = file_path
+                elif file_path.endswith('.graph.polygons.geojson'):
+                    polys = file_path
+
+            self.assertIsNotNone(points, "Points output missing")
+            self.assertIsNotNone(lines, "Lines output missing")
+            self.assertIsNotNone(polys, "Polygons output missing")
+
+            with open(points) as f:
+                data = json.load(f)
+                self.assertEqual(data.get("$schema"), OSW_SCHEMA_ID)
+                naturals = [feat["properties"].get("natural") for feat in data.get("features", [])]
+                self.assertIn("tree", naturals)
+
+            with open(lines) as f:
+                data = json.load(f)
+                self.assertEqual(data.get("$schema"), OSW_SCHEMA_ID)
+                naturals = [feat["properties"].get("natural") for feat in data.get("features", [])]
+                self.assertIn("tree_row", naturals)
+
+            with open(polys) as f:
+                data = json.load(f)
+                self.assertEqual(data.get("$schema"), OSW_SCHEMA_ID)
+                naturals = [feat["properties"].get("natural") for feat in data.get("features", [])]
+                self.assertIn("wood", naturals)
 
             for file_path in result.generated_files:
                 os.remove(file_path)

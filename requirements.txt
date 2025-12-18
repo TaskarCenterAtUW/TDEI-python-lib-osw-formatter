@@ -5,4 +5,4 @@ shapely~=2.0.2
 pyproj~=3.6.1
 coverage~=7.5.1
 ogr2osm==1.2.0
-python-osw-validation==0.2.15
+python-osw-validation==0.3.1
