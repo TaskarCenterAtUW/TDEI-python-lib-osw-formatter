@@ -1,5 +1,10 @@
 # Change log
 
+### 0.3.1
+- Preserve custom `ext:*` features across all geometries: ext-only points keep numeric IDs (no `p` prefix), ext-only lines/polygons are retained, and custom attributes are emitted in the appropriate GeoJSON file.
+- Add schema-safe handling for ext-only geometries during construction to avoid missing-ref crashes.
+- Emit GeoJSON with indentation for easier inspection.
+
 ### 0.3.0
 - Update converters to emit OSW 0.3 schema id and support new vegetation features (trees, tree rows, woods).
 - Extend OSW normalizers to keep `leaf_cycle` and `leaf_type` where allowed for points, lines, and polygons.
