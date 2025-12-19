@@ -25,6 +25,30 @@ def _tag_value(tags, key):
     return tags.get(f"ext:{key}", "")
 
 
+def _tags_to_dict(tags):
+    # Accept dict-like and osmium TagList-like objects
+    if hasattr(tags, "items"):
+        try:
+            return dict(tags)
+        except Exception:
+            pass
+
+    try:
+        return {
+            (item.k if hasattr(item, "k") else item[0]): (item.v if hasattr(item, "v") else item[1])
+            for item in tags
+            if (hasattr(item, "k") and hasattr(item, "v")) or (isinstance(item, tuple) and len(item) == 2)
+        }
+    except Exception:
+        return {}
+
+
+def _has_only_ext_tags(tags):
+    if not tags:
+        return False
+    return all(str(k).startswith("ext:") for k in tags.keys())
+
+
 class OSWWayNormalizer:
 
     ROAD_HIGHWAY_VALUES = (
@@ -271,7 +295,8 @@ class OSWPointNormalizer:
             self.is_manhole()) or (
             self.is_bollard()) or (
             self.is_street_lamp()) or (
-            self.is_tree())
+            self.is_tree()) or (
+            self.is_custom())
     
     @staticmethod
     def osw_point_filter(tags):
@@ -298,6 +323,8 @@ class OSWPointNormalizer:
                     "leaf_type": leaf_type
                 }
             )
+        elif self.is_custom():
+            return self._normalize_point()
         else:
             print(f"Invalid point skipped. Tags: {self.tags}")
             return {}
@@ -332,13 +359,17 @@ class OSWPointNormalizer:
     
     def is_tree(self):
         return _tag_value(self.tags, "natural") == "tree"
+
+    def is_custom(self):
+        tag_dict = _tags_to_dict(self.tags)
+        return _has_only_ext_tags(tag_dict)
     
 class OSWLineNormalizer:
     def __init__(self, tags):
         self.tags = tags
 
     def filter(self):
-        return (self.is_fence()) or (self.is_tree_row())
+        return (self.is_fence()) or (self.is_tree_row()) or (self.is_custom())
     
     @staticmethod
     def osw_line_filter(tags):
@@ -355,6 +386,8 @@ class OSWLineNormalizer:
                     "leaf_type": leaf_type
                 }
             )
+        elif self.is_custom():
+            return self._normalize_line()
         else:
             raise ValueError("This is an invalid line")
     
@@ -370,6 +403,10 @@ class OSWLineNormalizer:
     
     def is_tree_row(self):
         return _tag_value(self.tags, "natural") == "tree_row"
+
+    def is_custom(self):
+        tag_dict = _tags_to_dict(self.tags)
+        return _has_only_ext_tags(tag_dict)
     
 class OSWPolygonNormalizer:
     # Will be fetched from schema soon
@@ -479,7 +516,7 @@ class OSWPolygonNormalizer:
         self.tags = tags
 
     def filter(self):
-        return self.is_building() or self.is_wood()
+        return self.is_building() or self.is_wood() or self.is_custom()
     
     @staticmethod
     def osw_polygon_filter(tags):
@@ -506,6 +543,8 @@ class OSWPolygonNormalizer:
                     "leaf_type": leaf_type
                 }
             )
+        elif self.is_custom():
+            return self._normalize_polygon()
         else:
             raise ValueError("This is an invalid polygon")
     
@@ -521,6 +560,10 @@ class OSWPolygonNormalizer:
     
     def is_wood(self):
         return _tag_value(self.tags, "natural") == "wood"
+
+    def is_custom(self):
+        tag_dict = _tags_to_dict(self.tags)
+        return _has_only_ext_tags(tag_dict)
 
 class OSWZoneNormalizer:
     def __init__(self, tags):
