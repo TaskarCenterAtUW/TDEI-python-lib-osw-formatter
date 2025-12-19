@@ -75,7 +75,14 @@ To install the GDAL library (Geospatial Data Abstraction Library) on your system
    1. It takes the `zip` file which contains edges.geojson, points.geojson, nodes.geojson, zones.geojson, polygons.geojson and lines.geojson files, and output directory path(optional) as input
    2. Process the geojson files
    3. Convert those files into xml file at provided output directory path   
-    
+
+## Custom attributes (OSW 0.3)
+- Custom features that contain only `ext:*` attributes are preserved and written to their matching GeoJSON:
+  - Point geometries → `points.geojson` with numeric `_id` (no `p` prefix) and `ext:osm_id`.
+  - LineString geometries → `lines.geojson` with `_id`, `_u_id`, `_v_id`, plus `ext:*`.
+  - Polygon geometries → `polygons.geojson` with `_id` and `ext:*`.
+- Outputs are formatted with indentation to simplify inspection.
+
   
 ## Starting a new project with template  
   

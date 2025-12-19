@@ -121,13 +121,13 @@ class OSMPointParser(osmium.SimpleHandler):
         if not self.point_filter(n.tags):
             return
 
-        d = {}
-
         tags = dict(n.tags)
 
-        d2 = {**d, **OSWPointNormalizer(tags).normalize()}
+        normalizer = OSWPointNormalizer(tags)
+        normalized = normalizer.normalize()
 
-        self.G.add_node("p" + str(n.id), lon=n.location.lon, lat=n.location.lat, **d2)
+        node_id = n.id if normalizer.is_custom() else "p" + str(n.id)
+        self.G.add_node(node_id, lon=n.location.lon, lat=n.location.lat, **normalized)
 
 
 class OSMLineParser(osmium.SimpleHandler):
@@ -329,9 +329,11 @@ class OSMTaggedNodeParser(osmium.SimpleHandler):
             return
 
         if self.point_filter(tags):
-            normalized = OSWPointNormalizer(tags).normalize()
+            normalizer = OSWPointNormalizer(tags)
+            normalized = normalizer.normalize()
             if normalized:
-                self.G.add_node("p" + str(n.id), lon=n.location.lon, lat=n.location.lat, **normalized)
+                node_id = n.id if normalizer.is_custom() else "p" + str(n.id)
+                self.G.add_node(node_id, lon=n.location.lon, lat=n.location.lat, **normalized)
 
 class OSMGraph:
     def __init__(self, G: nx.MultiDiGraph = None) -> None:
@@ -515,33 +517,44 @@ class OSMGraph:
 
         for n, d in self.G.nodes(data=True):
             if OSWZoneNormalizer.osw_zone_filter(d):
+                ndref = d.get("ndref")
+                indref = d.get("indref", [])
+                if not ndref:
+                    continue
                 coords = []
-                for ref in d["ndref"]:
+                for ref in ndref:
                     node_d = self.G._node[int(ref)]
                     coords.append((node_d["lon"], node_d["lat"]))
 
-                geometry = Polygon(coords, d["indref"])
+                geometry = Polygon(coords, indref)
                 d["geometry"] = geometry
 
                 d["_w_id"] = d.pop("ndref")
-                del d["indref"]
+                d.pop("indref", None)
 
                 if progressbar:
                     progressbar.update(1)
             elif OSWPolygonNormalizer.osw_polygon_filter(d):
-                geometry = Polygon(d["ndref"], d["indref"])
+                ndref = d.get("ndref")
+                indref = d.get("indref", [])
+                if not ndref:
+                    continue
+                geometry = Polygon(ndref, indref)
                 d["geometry"] = geometry
 
-                del d["ndref"]
-                del d["indref"]
+                d.pop("ndref", None)
+                d.pop("indref", None)
 
                 if progressbar:
                     progressbar.update(1)
             elif OSWLineNormalizer.osw_line_filter(d):
-                geometry = LineString(d["ndref"])
+                ndref = d.get("ndref")
+                if not ndref:
+                    continue
+                geometry = LineString(ndref)
                 d["geometry"] = geometry
                 d["length"] = round(self.geod.geometry_length(geometry), 1)
-                del d["ndref"]
+                d.pop("ndref", None)
                 if progressbar:
                     progressbar.update(1)
             else:
@@ -689,27 +702,27 @@ class OSMGraph:
 
         if len(edge_features) > 0:
             with open(edges_path, 'w') as f:
-                json.dump(edges_fc, f)
+                json.dump(edges_fc, f, indent=2)
 
         if len(node_features) > 0:
             with open(nodes_path, 'w') as f:
-                json.dump(nodes_fc, f)
+                json.dump(nodes_fc, f, indent=2)
 
         if len(point_features) > 0:
             with open(points_path, "w") as f:
-                json.dump(points_fc, f)
+                json.dump(points_fc, f, indent=2)
 
         if len(line_features) > 0:
             with open(lines_path, "w") as f:
-                json.dump(lines_fc, f)
+                json.dump(lines_fc, f, indent=2)
 
         if len(zone_features) > 0:
             with open(zones_path, "w") as f:
-                json.dump(zones_fc, f)
+                json.dump(zones_fc, f, indent=2)
 
         if len(polygon_features) > 0:
             with open(polygons_path, "w") as f:
-                json.dump(polygons_fc, f)
+                json.dump(polygons_fc, f, indent=2)
 
     @classmethod
     def from_geojson(cls, nodes_path, edges_path):
