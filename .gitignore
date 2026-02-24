@@ -161,3 +161,5 @@ cython_debug/
 reports/
 output
 test_results
+
+.DS_Store

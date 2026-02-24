@@ -1,6 +1,7 @@
 import os
 import asyncio
 from osm_osw_reformatter import Formatter
+import argparse
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -27,6 +28,24 @@ def osw_convert():
     # f.cleanup()
 
 
+# if __name__ == '__main__':
+#     asyncio.run(osm_convert())
+#     osw_convert()
+
+def main():
+    parser = argparse.ArgumentParser(description='Convert between OSM and OSW')
+    parser.add_argument('-i', '--input', required=True, help='input file path')
+    parser.add_argument('-o', '--output', required=True, help='output directory')
+    parser.add_argument('-s', '--mode', required=True, choices=['OSW2OSM', 'OSM2OSW'], help='conversion mode')
+    args = parser.parse_args()
+
+    os.makedirs(args.output, exist_ok=True)
+    f = Formatter(workdir=args.output, file_path=args.input)
+
+    if args.mode == 'OSM2OSW':
+        asyncio.run(f.osm2osw())
+    else:
+        f.osw2osm()
+
 if __name__ == '__main__':
-    asyncio.run(osm_convert())
-    osw_convert()
+    main()
