@@ -633,34 +633,23 @@ class OSMGraph:
                 properties["ext:osm_id"] = str(properties.get("osm_id", source_id))
             properties.pop("osm_id", None)
 
-        edge_features = []
-        for u, v, d in self.G.edges(data=True):
-            d_copy = {**d}
-            d_copy['_id'] = str(edge_id_counter)
-            edge_id_counter += 1
-            d_copy['_u_id'] = str(u)
-            d_copy['_v_id'] = str(v)
-
-            d_copy['ext:osm_id'] = str(d['osm_id'])
-
-            if 'osm_id' in d_copy:
-                d_copy.pop('osm_id')
-
-            if 'segment' in d_copy:
-                d_copy.pop('segment')
-
-            geometry = mapping(d_copy.pop('geometry'))
-
-            edge_features.append(
-                {'type': 'Feature', 'geometry': geometry, 'properties': d_copy}
-            )
-        edges_fc = {**OSW_JSON_HEADER, **{"features": edge_features}}
+        def _remap_node_ref(ref, node_id_map):
+            if ref in node_id_map:
+                return node_id_map[ref]
+            try:
+                ref_int = int(ref)
+            except (TypeError, ValueError):
+                ref_int = None
+            if ref_int is not None and ref_int in node_id_map:
+                return node_id_map[ref_int]
+            return str(ref)
 
         node_features = []
         point_features = []
         line_features = []
         zone_features = []
         polygon_features = []
+        node_id_map = {}
         for n, d in self.G.nodes(data=True):
             d_copy = {**d}
             source_id = _source_id(n)
@@ -705,6 +694,7 @@ class OSMGraph:
                 )
             else:
                 _assign_ids(d_copy, node_id_counter, source_id)
+                node_id_map[n] = d_copy["_id"]
                 node_id_counter += 1
 
                 geometry = mapping(d_copy.pop('geometry'))
@@ -718,6 +708,38 @@ class OSMGraph:
                 node_features.append(
                     {'type': 'Feature', 'geometry': geometry, 'properties': d_copy}
                 )
+
+        for zone_feature in zone_features:
+            props = zone_feature.get("properties", {})
+            w_ids = props.get("_w_id")
+            if isinstance(w_ids, list):
+                props["_w_id"] = [str(_remap_node_ref(ref, node_id_map)) for ref in w_ids]
+            elif w_ids is not None:
+                props["_w_id"] = str(_remap_node_ref(w_ids, node_id_map))
+
+        edge_features = []
+        for u, v, d in self.G.edges(data=True):
+            d_copy = {**d}
+            d_copy['_id'] = str(edge_id_counter)
+            edge_id_counter += 1
+            d_copy['_u_id'] = str(node_id_map.get(u, u))
+            d_copy['_v_id'] = str(node_id_map.get(v, v))
+
+            d_copy['ext:osm_id'] = str(d['osm_id'])
+
+            if 'osm_id' in d_copy:
+                d_copy.pop('osm_id')
+
+            if 'segment' in d_copy:
+                d_copy.pop('segment')
+
+            geometry = mapping(d_copy.pop('geometry'))
+
+            edge_features.append(
+                {'type': 'Feature', 'geometry': geometry, 'properties': d_copy}
+            )
+        edges_fc = {**OSW_JSON_HEADER, **{"features": edge_features}}
+
         nodes_fc = {**OSW_JSON_HEADER, **{"features": node_features}}
         points_fc = {**OSW_JSON_HEADER, **{"features": point_features}}
         lines_fc = {**OSW_JSON_HEADER, **{"features": line_features}}
