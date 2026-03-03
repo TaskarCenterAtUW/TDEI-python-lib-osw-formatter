@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><osm version="0.6" generator="TDEI exporter" upload="false">
+<node visible="true" version="1" id="1" lat="47.6436499" lon="-122.1429456"/>
+<node visible="true" version="1" id="2" lat="47.6436495" lon="-122.1430253"><tag k="ext:osm_id" v="14"/></node>
+<node visible="true" version="1" id="3" lat="47.6435058" lon="-122.1433361"/>
+<node visible="true" version="1" id="4" lat="47.6433557" lon="-122.1433316"/>
+<node visible="true" version="1" id="5" lat="47.6433557" lon="-122.1432618"/>
+<node visible="true" version="1" id="6" lat="47.6435058" lon="-122.1432618"/>
+<node visible="true" version="1" id="7" lat="47.6436499" lon="-122.1429282"><tag k="ext:osm_id" v="25"/><tag k="ext:test_field" v="custom_value"/></node>
+<node visible="true" version="1" id="8" lat="47.6435058" lon="-122.1433361"/>
+<node visible="true" version="1" id="9" lat="47.6437429" lon="-122.1429105"><tag k="ext:osm_id" v="28"/><tag k="ext:test_field" v="custom_value"/></node>
+<node visible="true" version="1" id="10" lat="47.6437636" lon="-122.1429432"><tag k="ext:osm_id" v="3"/><tag k="ext:test_field" v="custom_value"/></node>
+<node visible="true" version="1" id="11" lat="47.6435058" lon="-122.1433361"/>
+<node visible="true" version="1" id="12" lat="47.6433557" lon="-122.1433316"/>
+<node visible="true" version="1" id="13" lat="47.6433557" lon="-122.1432618"/>
+<node visible="true" version="1" id="14" lat="47.6435058" lon="-122.1432618"/>
+<node visible="true" version="1" id="15" lat="47.6435058" lon="-122.1433361"/>
+<node visible="true" version="1" id="16" lat="47.6437325" lon="-122.1429432"/>
+<node visible="true" version="1" id="17" lat="47.6438124" lon="-122.1429647"/>
+<node visible="true" version="1" id="18" lat="47.6437338" lon="-122.1430452"/>
+<node visible="true" version="1" id="19" lat="47.6438124" lon="-122.1429446"/>
+<node visible="true" version="1" id="20" lat="47.6437896" lon="-122.1430443"/>
+<node visible="true" version="1" id="21" lat="47.6438272" lon="-122.1429446"/>
+<node visible="true" version="1" id="22" lat="47.6437896" lon="-122.1429422"/>
+<node visible="true" version="1" id="23" lat="47.6438272" lon="-122.1429647"/>
+<node visible="true" version="1" id="24" lat="47.6437338" lon="-122.1429422"/>
+<node visible="true" version="1" id="25" lat="47.6438124" lon="-122.1429647"/>
+<node visible="true" version="1" id="26" lat="47.6439343" lon="-122.1429531"/>
+<node visible="true" version="1" id="27" lat="47.6438391" lon="-122.1429522"/>
+<node visible="true" version="1" id="28" lat="47.6437345" lon="-122.1429278"><tag k="ext:osm_id" v="29"/><tag k="ext:man_made" v="manhole"/></node>
+<node visible="true" version="1" id="29" lat="47.643988" lon="-122.1429563"><tag k="natural" v="tree"/><tag k="leaf_type" v="broadleaved"/><tag k="ext:osm_id" v="30"/><tag k="leaf_cycle" v="deciduous"/></node>
+<way visible="true"  version="1" id="1"><nd ref="3"/><nd ref="4"/><nd ref="5"/><nd ref="6"/><nd ref="8"/><tag k="ext:osm_id" v="2"/><tag k="ext:building" v="yes"/></way>
+<way visible="true"  version="1" id="2"><nd ref="11"/><nd ref="12"/><nd ref="13"/><nd ref="14"/><nd ref="15"/><tag k="ext:osm_id" v="4"/><tag k="ext:building" v="yes"/></way>
+<way visible="true"  version="1" id="3"><nd ref="17"/><nd ref="19"/><nd ref="21"/><nd ref="23"/><nd ref="25"/><tag k="natural" v="wood"/><tag k="leaf_type" v="broadleaved"/><tag k="ext:osm_id" v="6"/><tag k="leaf_cycle" v="deciduous"/></way>
+<way visible="true"  version="1" id="4"><nd ref="2"/><nd ref="1"/><tag k="footway" v="traffic_island"/><tag k="highway" v="footway"/><tag k="incline" v="-0.013"/><tag k="surface" v="asphalt"/><tag k="ext:osm_id" v="5"/></way>
+<way visible="true"  version="1" id="5"><nd ref="16"/><nd ref="18"/><nd ref="20"/><nd ref="22"/><nd ref="24"/><tag k="ext:length" v="16.1"/><tag k="ext:osm_id" v="6"/><tag k="ext:barrier" v="fence"/></way>
+<way visible="true"  version="1" id="6"><nd ref="26"/><nd ref="27"/><tag k="natural" v="tree_row"/><tag k="leaf_type" v="broadleaved"/><tag k="ext:osm_id" v="7"/><tag k="leaf_cycle" v="deciduous"/></way>
+</osm>

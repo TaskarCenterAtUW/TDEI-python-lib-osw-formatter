@@ -1,5 +1,10 @@
 # Change log
 
+### 0.3.2
+- Fix duplicate polygon `_id` generation in OSM→OSW export by assigning sequential IDs per feature type.
+- Remap edge `_u_id`/`_v_id` and zone `_w_id` references to exported node IDs so references stay consistent after ID normalization.
+- Harden OSM ID remapping in normalizer output with deterministic per-type counters and relation-member type-aware reference rewrites.
+
 ### 0.3.1
 - Preserve custom `ext:*` features across all geometries: ext-only points keep numeric IDs (no `p` prefix), ext-only lines/polygons are retained, and custom attributes are emitted in the appropriate GeoJSON file.
 - Add schema-safe handling for ext-only geometries during construction to avoid missing-ref crashes.
