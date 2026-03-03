@@ -25,8 +25,10 @@ class DummyOsmGeometry:
 
 
 class DummyMember:
-    def __init__(self, ref):
+    def __init__(self, ref, member_type=None):
         self.ref = ref
+        if member_type is not None:
+            self.type = member_type
 
 
 class DummyRel:
@@ -204,6 +206,45 @@ class TestOSMNormalizer(unittest.TestCase):
             else:
                 self.assertIsInstance(r, str)
         self.assertGreaterEqual(rel.members[0].ref, 0)
+
+    def test_process_output_assigns_unique_ids_when_source_ids_repeat(self):
+        nodes = [
+            DummyOsmGeometry(tags={'_id': ['10']}, osm_id=10),
+            DummyOsmGeometry(tags={'_id': ['10']}, osm_id=10),
+            DummyOsmGeometry(tags={'_id': ['11']}, osm_id=11),
+        ]
+        ways = [
+            DummyOsmGeometry(tags={'_id': ['20']}, osm_id=20),
+            DummyOsmGeometry(tags={'_id': ['20']}, osm_id=20),
+            DummyOsmGeometry(tags={'_id': ['21']}, osm_id=21),
+        ]
+
+        self.normalizer.process_output(nodes, ways, [])
+
+        self.assertEqual(sorted([n.id for n in nodes]), [1, 2, 3])
+        self.assertEqual(sorted([w.id for w in ways]), [1, 2, 3])
+        for idx, node in enumerate(sorted(nodes, key=lambda n: n.id), start=1):
+            self.assertEqual(node.tags.get('_id'), [str(idx)])
+        for idx, way in enumerate(sorted(ways, key=lambda w: w.id), start=1):
+            self.assertEqual(way.tags.get('_id'), [str(idx)])
+
+    def test_process_output_relation_member_type_uses_correct_id_map(self):
+        node = DummyOsmGeometry(tags={'_id': ['7']}, osm_id=7)
+        way = DummyOsmGeometry(tags={'_id': ['7']}, osm_id=7)
+        rel = DummyRel(
+            9,
+            members=[
+                DummyMember(ref=7, member_type='node'),
+                DummyMember(ref=7, member_type='way'),
+            ],
+        )
+
+        self.normalizer.process_output([node], [way], [rel])
+
+        self.assertEqual(node.id, 1)
+        self.assertEqual(way.id, 1)
+        self.assertEqual(rel.members[0].ref, 1)
+        self.assertEqual(rel.members[1].ref, 1)
 
 
 if __name__ == '__main__':
