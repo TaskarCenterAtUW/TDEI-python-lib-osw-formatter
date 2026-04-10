@@ -150,13 +150,20 @@ class OSMLineParser(osmium.SimpleHandler):
         if self.progressbar:
             self.progressbar.update(1)
 
-        if not self.line_filter(w.tags):
+        tags = dict(w.tags)
+        if not self.line_filter(tags):
             return
 
         d = {}
-        tags = dict(w.tags)
+        normalizer = OSWLineNormalizer(tags)
 
-        d2 = {**d, **OSWLineNormalizer(tags).normalize()}
+        is_closed = len(w.nodes) > 2 and w.nodes[0].ref == w.nodes[-1].ref
+        if is_closed and normalizer.is_custom() and not (
+            normalizer.is_fence() or normalizer.is_tree_row()
+        ):
+            return
+
+        d2 = {**d, **normalizer.normalize()}
 
         ndref = []
         for i in range(len(w.nodes)):
@@ -264,13 +271,23 @@ class OSMPolygonParser(osmium.SimpleHandler):
         if self.progressbar:
             self.progressbar.update(1)
 
-        if not self.polygon_filter(a.tags):
+        tags = dict(a.tags)
+        if not self.polygon_filter(tags):
             return
 
         d = {}
-        tags = dict(a.tags)
+        normalizer = OSWPolygonNormalizer(tags)
+        line_normalizer = OSWLineNormalizer(tags)
+        zone_normalizer = OSWZoneNormalizer(tags)
 
-        d2 = {**d, **OSWPolygonNormalizer(tags).normalize()}
+        if normalizer.is_custom() and (
+            line_normalizer.is_fence()
+            or line_normalizer.is_tree_row()
+            or zone_normalizer.is_pedestrian()
+        ):
+            return
+
+        d2 = {**d, **normalizer.normalize()}
 
         exteriors_count = 0
         for exterior in a.outer_rings():
@@ -534,7 +551,7 @@ class OSMGraph:
 
                 if progressbar:
                     progressbar.update(1)
-            elif OSWPolygonNormalizer.osw_polygon_filter(d):
+            elif "ndref" in d and "indref" in d:
                 ndref = d.get("ndref")
                 indref = d.get("indref", [])
                 if not ndref:
@@ -547,7 +564,7 @@ class OSMGraph:
 
                 if progressbar:
                     progressbar.update(1)
-            elif OSWLineNormalizer.osw_line_filter(d):
+            elif "ndref" in d:
                 ndref = d.get("ndref")
                 if not ndref:
                     continue
@@ -653,11 +670,28 @@ class OSMGraph:
         for n, d in self.G.nodes(data=True):
             d_copy = {**d}
             source_id = _source_id(n)
+            geometry_obj = d_copy.pop("geometry")
+            geometry = mapping(geometry_obj)
+            geometry_type = geometry_obj.geom_type
+            is_topology_node = geometry_type == "Point" and self.G.degree(n) > 0
 
-            if OSWPointNormalizer.osw_point_filter(d):
+            if is_topology_node:
+                _assign_ids(d_copy, node_id_counter, source_id)
+                node_id_map[n] = d_copy["_id"]
+                node_id_counter += 1
+
+                if 'lon' in d_copy:
+                    d_copy.pop('lon')
+
+                if 'lat' in d_copy:
+                    d_copy.pop('lat')
+
+                node_features.append(
+                    {'type': 'Feature', 'geometry': geometry, 'properties': d_copy}
+                )
+            elif geometry_type == "Point" and OSWPointNormalizer.osw_point_filter(d):
                 _assign_ids(d_copy, point_id_counter, source_id)
                 point_id_counter += 1
-                geometry = mapping(d_copy.pop("geometry"))
 
                 if "lon" in d_copy:
                     d_copy.pop("lon")
@@ -668,26 +702,23 @@ class OSMGraph:
                 point_features.append(
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
                 )
-            elif OSWLineNormalizer.osw_line_filter(d):
+            elif geometry_type == "LineString":
                 _assign_ids(d_copy, line_id_counter, source_id)
                 line_id_counter += 1
-                geometry = mapping(d_copy.pop("geometry"))
 
                 line_features.append(
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
                 )
-            elif OSWZoneNormalizer.osw_zone_filter(d):
+            elif geometry_type == "Polygon" and OSWZoneNormalizer.osw_zone_filter(d):
                 _assign_ids(d_copy, zone_id_counter, source_id)
                 zone_id_counter += 1
-                geometry = mapping(d_copy.pop("geometry"))
 
                 zone_features.append(
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
                 )
-            elif OSWPolygonNormalizer.osw_polygon_filter(d):
+            elif geometry_type == "Polygon":
                 _assign_ids(d_copy, polygon_id_counter, source_id)
                 polygon_id_counter += 1
-                geometry = mapping(d_copy.pop("geometry"))
 
                 polygon_features.append(
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
@@ -696,8 +727,6 @@ class OSMGraph:
                 _assign_ids(d_copy, node_id_counter, source_id)
                 node_id_map[n] = d_copy["_id"]
                 node_id_counter += 1
-
-                geometry = mapping(d_copy.pop('geometry'))
 
                 if 'lon' in d_copy:
                     d_copy.pop('lon')

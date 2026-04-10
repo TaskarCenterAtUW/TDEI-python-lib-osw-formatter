@@ -1,5 +1,11 @@
 # Change log
 
+### 0.3.3
+- Fix OSM→OSW export classification so canonical OSM tags are used for semantic recognition and `ext:*` tags are preserved as extensions instead of being treated as feature-defining tags.
+- Fix closed ext-only ways such as `ext:demolished:building=yes` to emit polygon output without falling through to point geometry construction.
+- Fix GeoJSON node/point export so topology endpoints remain in `nodes.geojson`, keeping edge `_u_id`/`_v_id` references OSW-compliant on roundtrip validation.
+- Add regression coverage for bug 3477 and serializer/compliance cases around ext-only geometries and remapped node references.
+
 ### 0.3.2
 - Fix duplicate polygon `_id` generation in OSM→OSW export by assigning sequential IDs per feature type.
 - Remap edge `_u_id`/`_v_id` and zone `_w_id` references to exported node IDs so references stay consistent after ID normalization.

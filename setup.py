@@ -26,7 +26,13 @@ setup(
     },
     long_description_content_type='text/markdown',
     url='https://github.com/TaskarCenterAtUW/TDEI-python-lib-osw-formatter',
-    install_requires=install_requires,
+    install_requires=[
+        'osmium~=3.6.0',
+        'asyncio~=3.4.3',
+        'networkx~=3.2',
+        'shapely~=2.0.2',
+        'ogr2osm==1.2.0'
+    ],
     packages=find_packages(where='src'),
     classifiers=[
         'Programming Language :: Python :: 3',
