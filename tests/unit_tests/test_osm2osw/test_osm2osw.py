@@ -14,6 +14,7 @@ TEST_WIDTH_FILE = os.path.join(ROOT_DIR, 'test_files/width-test.xml')
 TEST_INCLINE_FILE = os.path.join(ROOT_DIR, 'test_files/incline-test.xml')
 TEST_INVALID_NODE_TAGS_FILE = os.path.join(ROOT_DIR, 'test_files/node_with_invalid_tags.xml')
 TEST_TREE_FILE = os.path.join(ROOT_DIR, 'test_files/tree-test.xml')
+TEST_BUG_3477_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3477.xml')
 
 
 def is_valid_float(value):
@@ -319,6 +320,33 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(result.generated_files), 0)
             for file in result.generated_files:
                 os.remove(file)
+
+        asyncio.run(run_test())
+
+    def test_bug_3477_ext_only_closed_way_emits_polygon(self):
+        osm_file_path = TEST_BUG_3477_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='bug3477')
+            result = await osm2osw.convert()
+            self.assertTrue(result.status)
+            self.assertEqual(len(result.generated_files), 1)
+
+            polygon_file = result.generated_files[0]
+            self.assertTrue(polygon_file.endswith('.graph.polygons.geojson'))
+
+            with open(polygon_file) as f:
+                geojson = json.load(f)
+
+            self.assertEqual(geojson.get("$schema"), OSW_SCHEMA_ID)
+            self.assertEqual(len(geojson.get("features", [])), 1)
+
+            feature = geojson["features"][0]
+            self.assertEqual(feature["geometry"]["type"], "Polygon")
+            self.assertEqual(feature["properties"].get("ext:demolished:building"), "yes")
+
+            for file_path in result.generated_files:
+                os.remove(file_path)
 
         asyncio.run(run_test())
 

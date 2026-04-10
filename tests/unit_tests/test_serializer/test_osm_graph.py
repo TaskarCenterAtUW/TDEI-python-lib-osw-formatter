@@ -16,7 +16,9 @@ from src.osm_osw_reformatter.serializer.osm.osm_graph import (
     OSMTaggedNodeParser,
 )
 from src.osm_osw_reformatter.serializer.osw.osw_normalizer import (
+    OSWLineNormalizer,
     OSWNodeNormalizer,
+    OSWPolygonNormalizer,
     OSWPointNormalizer,
 )
 
@@ -510,6 +512,25 @@ class TestOSMGraph(unittest.TestCase):
             self.assertEqual(len(self.mock_graph.nodes), 1)
             self.assertEqual(len(self.mock_graph.edges), 0)
 
+    def test_line_parser_skips_closed_ambiguous_custom_way(self):
+        parser = OSMLineParser(self.mock_graph, OSWLineNormalizer.osw_line_filter)
+        nodes = [
+            MagicMock(ref=1),
+            MagicMock(ref=2),
+            MagicMock(ref=3),
+            MagicMock(ref=1),
+        ]
+
+        parser.way(
+            MagicMock(
+                tags={"ext:demolished:building": "yes"},
+                id=301846,
+                nodes=nodes,
+            )
+        )
+
+        self.assertEqual(len(self.mock_graph.nodes), 0)
+
     def test_construct_geometries_missing_node_attributes(self):
         # Add edge with references to missing nodes
         self.mock_graph.add_node(1, lon=1)
@@ -531,6 +552,47 @@ class TestOSMGraph(unittest.TestCase):
 
         edges = list(self.osm_graph.get_graph().edges(data=True))
         self.assertEqual(len(edges), 1)
+
+    def test_construct_geometries_custom_polygon_node(self):
+        self.mock_graph.add_node(
+            "g301846",
+            ndref=[
+                [-122.3206583, 47.6151489],
+                [-122.3203266, 47.6151507],
+                [-122.3203263, 47.6149898],
+                [-122.3206509, 47.6149868],
+                [-122.3206583, 47.6151489],
+            ],
+            indref=[],
+            **{"ext:demolished:building": "yes"},
+        )
+
+        self.osm_graph.construct_geometries()
+
+        node_data = self.mock_graph.nodes["g301846"]
+        self.assertIn("geometry", node_data)
+        self.assertIsInstance(node_data["geometry"], Polygon)
+
+    def test_polygon_parser_accepts_closed_custom_area(self):
+        parser = OSMPolygonParser(self.mock_graph, OSWPolygonNormalizer.osw_polygon_filter)
+        outer_ring = [[
+            MagicMock(lon=-122.3206583, lat=47.6151489),
+            MagicMock(lon=-122.3203266, lat=47.6151507),
+            MagicMock(lon=-122.3203263, lat=47.6149898),
+            MagicMock(lon=-122.3206509, lat=47.6149868),
+            MagicMock(lon=-122.3206583, lat=47.6151489),
+        ]]
+
+        parser.area(
+            MagicMock(
+                tags={"ext:demolished:building": "yes"},
+                id=301846,
+                outer_rings=lambda: outer_ring,
+                inner_rings=lambda _: [],
+            )
+        )
+
+        self.assertIn("g301846", self.mock_graph.nodes)
 
     def test_to_geojson_empty_graph(self):
         # Paths for test files
@@ -896,6 +958,62 @@ class TestFromGeoJSON(unittest.TestCase):
             with open(edges_path) as f:
                 edge_data = json.load(f)
 
+            node_ids = {feat["properties"]["_id"] for feat in node_data["features"]}
+            edge = edge_data["features"][0]["properties"]
+            self.assertIn(edge["_u_id"], node_ids)
+            self.assertIn(edge["_v_id"], node_ids)
+
+    def test_to_geojson_topology_points_stay_in_nodes_file(self):
+        graph = nx.MultiDiGraph()
+        graph.add_node(
+            10,
+            geometry=Point(0, 0),
+            lon=0.0,
+            lat=0.0,
+            **{"ext:osm_version": "1"},
+        )
+        graph.add_node(
+            20,
+            geometry=Point(1, 1),
+            lon=1.0,
+            lat=1.0,
+            **{"ext:osm_version": "1"},
+        )
+        graph.add_edge(
+            10,
+            20,
+            geometry=LineString([(0, 0), (1, 1)]),
+            osm_id="99",
+        )
+
+        osm_graph = OSMGraph(G=graph)
+
+        with TemporaryDirectory() as tmpdir:
+            nodes_path = os.path.join(tmpdir, 'nodes.geojson')
+            edges_path = os.path.join(tmpdir, 'edges.geojson')
+            points_path = os.path.join(tmpdir, 'points.geojson')
+            lines_path = os.path.join(tmpdir, 'lines.geojson')
+            zones_path = os.path.join(tmpdir, 'zones.geojson')
+            polygons_path = os.path.join(tmpdir, 'polygons.geojson')
+
+            osm_graph.to_geojson(
+                nodes_path,
+                edges_path,
+                points_path,
+                lines_path,
+                zones_path,
+                polygons_path,
+            )
+
+            self.assertTrue(os.path.exists(nodes_path))
+            self.assertFalse(os.path.exists(points_path))
+
+            with open(nodes_path) as f:
+                node_data = json.load(f)
+            with open(edges_path) as f:
+                edge_data = json.load(f)
+
+            self.assertEqual(len(node_data["features"]), 2)
             node_ids = {feat["properties"]["_id"] for feat in node_data["features"]}
             edge = edge_data["features"][0]["properties"]
             self.assertIn(edge["_u_id"], node_ids)
