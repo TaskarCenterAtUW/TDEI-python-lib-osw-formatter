@@ -35,7 +35,7 @@ class TestOSWWayNormalizer(unittest.TestCase):
     def test_is_sidewalk_with_ext_tags(self):
         tags = {'ext:highway': 'footway', 'ext:footway': 'sidewalk'}
         normalizer = OSWWayNormalizer(tags)
-        self.assertTrue(normalizer.is_sidewalk())
+        self.assertFalse(normalizer.is_sidewalk())
 
     def test_is_crossing(self):
         tags = {'highway': 'footway', 'footway': 'crossing'}
@@ -154,12 +154,12 @@ class TestOSWNodeNormalizer(unittest.TestCase):
     def test_is_kerb_with_ext_tags(self):
         tags = {'ext:kerb': 'flush'}
         normalizer = OSWNodeNormalizer(tags)
-        self.assertTrue(normalizer.is_kerb())
+        self.assertFalse(normalizer.is_kerb())
 
     def test_is_kerb_with_ext_barrier_only(self):
         tags = {'ext:barrier': 'kerb'}
         normalizer = OSWNodeNormalizer(tags)
-        self.assertTrue(normalizer.is_kerb())
+        self.assertFalse(normalizer.is_kerb())
 
     def test_is_kerb_invalid(self):
         tags = {'kerb': 'invalid_type'}
@@ -219,7 +219,7 @@ class TestOSWPointNormalizer(unittest.TestCase):
     def test_is_tree_with_ext_tags(self):
         tags = {'ext:natural': 'tree'}
         normalizer = OSWPointNormalizer(tags)
-        self.assertTrue(normalizer.is_tree())
+        self.assertFalse(normalizer.is_tree())
 
     def test_normalize_tree(self):
         tags = {'natural': 'tree', 'leaf_cycle': 'Deciduous', 'leaf_type': 'needleLeaved'}
@@ -238,7 +238,7 @@ class TestOSWLineNormalizer(unittest.TestCase):
     def test_is_fence_with_ext_tags(self):
         tags = {'ext:barrier': 'fence'}
         normalizer = OSWLineNormalizer(tags)
-        self.assertTrue(normalizer.is_fence())
+        self.assertFalse(normalizer.is_fence())
 
     def test_normalize_tree_row(self):
         tags = {'natural': 'tree_row', 'leaf_cycle': 'evergreen', 'leaf_type': 'leafless'}
@@ -263,7 +263,16 @@ class TestOSWPolygonNormalizer(unittest.TestCase):
     def test_is_building_with_ext_tags(self):
         tags = {'ext:building': 'yes'}
         normalizer = OSWPolygonNormalizer(tags)
-        self.assertTrue(normalizer.is_building())
+        self.assertFalse(normalizer.is_building())
+
+    def test_custom_polygon_ignores_internal_geometry_keys(self):
+        tags = {
+            'ext:demolished:building': 'yes',
+            'ndref': [[0.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            'indref': [],
+        }
+        normalizer = OSWPolygonNormalizer(tags)
+        self.assertTrue(normalizer.is_custom())
 
     def test_normalize_wood(self):
         tags = {'natural': 'wood', 'leaf_cycle': 'mixed', 'leaf_type': 'broadleaved'}
@@ -289,7 +298,7 @@ class TestOSWZoneNormalizer(unittest.TestCase):
     def test_is_pedestrian_with_ext_tags(self):
         tags = {'ext:highway': 'pedestrian'}
         normalizer = OSWZoneNormalizer(tags)
-        self.assertTrue(normalizer.is_pedestrian())
+        self.assertFalse(normalizer.is_pedestrian())
 
 
 class TestCommonFunctions(unittest.TestCase):

@@ -20,9 +20,7 @@ LEAF_TYPE_VALUES = (
 
 
 def _tag_value(tags, key):
-    if key in tags:
-        return tags.get(key, "")
-    return tags.get(f"ext:{key}", "")
+    return tags.get(key, "")
 
 
 def _tags_to_dict(tags):
@@ -41,6 +39,25 @@ def _tags_to_dict(tags):
         }
     except Exception:
         return {}
+
+
+def _feature_tags(tags):
+    tag_dict = _tags_to_dict(tags)
+    internal_keys = {
+        "geometry",
+        "indref",
+        "lat",
+        "length",
+        "lon",
+        "ndref",
+        "osm_id",
+        "segment",
+    }
+    return {
+        k: v
+        for k, v in tag_dict.items()
+        if k not in internal_keys and not str(k).startswith("_")
+    }
 
 
 def _has_only_ext_tags(tags):
@@ -278,7 +295,7 @@ class OSWNodeNormalizer:
     def is_kerb(self):
         kerb_value = _tag_value(self.tags, "kerb")
         barrier_value = _tag_value(self.tags, "barrier")
-        has_kerb_key = "kerb" in self.tags or "ext:kerb" in self.tags
+        has_kerb_key = "kerb" in self.tags
         return (kerb_value in self.KERB_VALUES) or (
             barrier_value == "kerb" and (not has_kerb_key or kerb_value == "yes")
         )
@@ -361,7 +378,7 @@ class OSWPointNormalizer:
         return _tag_value(self.tags, "natural") == "tree"
 
     def is_custom(self):
-        tag_dict = _tags_to_dict(self.tags)
+        tag_dict = _feature_tags(self.tags)
         return _has_only_ext_tags(tag_dict)
     
 class OSWLineNormalizer:
@@ -405,7 +422,7 @@ class OSWLineNormalizer:
         return _tag_value(self.tags, "natural") == "tree_row"
 
     def is_custom(self):
-        tag_dict = _tags_to_dict(self.tags)
+        tag_dict = _feature_tags(self.tags)
         return _has_only_ext_tags(tag_dict)
     
 class OSWPolygonNormalizer:
@@ -556,13 +573,13 @@ class OSWPolygonNormalizer:
         return new_tags
     
     def is_building(self):
-        return _tag_value(self.tags, "building") in self.BUILDING_VALUES
+        return self.tags.get("building", "") in self.BUILDING_VALUES
     
     def is_wood(self):
         return _tag_value(self.tags, "natural") == "wood"
 
     def is_custom(self):
-        tag_dict = _tags_to_dict(self.tags)
+        tag_dict = _feature_tags(self.tags)
         return _has_only_ext_tags(tag_dict)
 
 class OSWZoneNormalizer:

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="test" upload="false">
+  <node id="1" visible="true" version="1" changeset="1" timestamp="2025-02-28T06:06:01Z" user="Cy Rossignol" uid="1" lat="47.6151489" lon="-122.3206583"/>
+  <node id="2" visible="true" version="1" changeset="1" timestamp="2025-02-28T06:06:01Z" user="Cy Rossignol" uid="1" lat="47.6149868" lon="-122.3206509"/>
+  <node id="3" visible="true" version="1" changeset="1" timestamp="2025-02-28T06:06:01Z" user="Cy Rossignol" uid="1" lat="47.6149898" lon="-122.3203263"/>
+  <node id="4" visible="true" version="1" changeset="1" timestamp="2025-02-28T06:06:01Z" user="Cy Rossignol" uid="1" lat="47.6151507" lon="-122.3203266"/>
+
+  <way id="301846" visible="true" version="2" changeset="816" timestamp="2026-01-07T22:03:22Z" user="Amy Bordenave" uid="8">
+    <nd ref="1"/>
+    <nd ref="4"/>
+    <nd ref="3"/>
+    <nd ref="2"/>
+    <nd ref="1"/>
+    <tag k="ext:demolished:building" v="yes"/>
+  </way>
+</osm>
