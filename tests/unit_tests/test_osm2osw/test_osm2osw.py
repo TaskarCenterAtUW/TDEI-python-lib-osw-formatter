@@ -15,6 +15,7 @@ TEST_INCLINE_FILE = os.path.join(ROOT_DIR, 'test_files/incline-test.xml')
 TEST_INVALID_NODE_TAGS_FILE = os.path.join(ROOT_DIR, 'test_files/node_with_invalid_tags.xml')
 TEST_TREE_FILE = os.path.join(ROOT_DIR, 'test_files/tree-test.xml')
 TEST_BUG_3477_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3477.xml')
+TEST_BUG_3286_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3286.xml')
 
 
 def is_valid_float(value):
@@ -344,6 +345,26 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
             feature = geojson["features"][0]
             self.assertEqual(feature["geometry"]["type"], "Polygon")
             self.assertEqual(feature["properties"].get("ext:demolished:building"), "yes")
+
+            for file_path in result.generated_files:
+                os.remove(file_path)
+
+        asyncio.run(run_test())
+
+    def test_bug_3286_consecutive_duplicate_nodes(self):
+        osm_file_path = TEST_BUG_3286_FILE
+
+        async def run_test():
+            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
+            result = await osm2osw.convert()
+            self.assertTrue(result.status)
+            self.assertEqual(len(result.generated_files), 2)
+
+            for file_path in result.generated_files:
+                if file_path.endswith('edges.geojson'):
+                    with open(file_path) as f:
+                        geojson = json.load(f)
+                        self.assertEqual(len(geojson.get("features", [])), 1)
 
             for file_path in result.generated_files:
                 os.remove(file_path)

@@ -1,5 +1,8 @@
 # Change log
 
+### 0.3.4
+- Fix OSM→OSW conversion when OSM Way contains consecutive duplicate nodes (bug 3286). Instead of generating an invalid 0 length geometry, the segment is ignored.
+
 ### 0.3.3
 - Fix OSM→OSW export classification so canonical OSM tags are used for semantic recognition and `ext:*` tags are preserved as extensions instead of being treated as feature-defining tags.
 - Fix closed ext-only ways such as `ext:demolished:building=yes` to emit polygon output without falling through to point geometry construction.
