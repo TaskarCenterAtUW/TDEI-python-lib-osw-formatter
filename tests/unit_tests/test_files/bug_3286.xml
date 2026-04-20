@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="TDEI exporter" upload="false">
+<node visible="true" version="1" id="8223" lat="47.9217092" lon="-122.2499566"><tag k="ext:osm_version" v="2"/></node>
+<node visible="true" version="1" id="8224" lat="47.9217137" lon="-122.2499283"><tag k="ext:osm_version" v="2"/></node>
+<node visible="true" version="1" id="8232" lat="47.9217122" lon="-122.2499433"><tag k="ext:osm_version" v="2"/></node>
+<node visible="true" version="1" id="8237" lat="47.9217066" lon="-122.2499667"><tag k="ext:osm_version" v="2"/></node>
+<node visible="true" version="1" id="8241" lat="47.9217132" lon="-122.2499356"><tag k="ext:osm_version" v="2"/></node>
+<node visible="true" version="1" id="16255" lat="47.9217166" lon="-122.2495229"><tag k="ext:osm_version" v="2"/></node>
+<way visible="true"  version="1" id="19002"><nd ref="8237"/><nd ref="8237"/><nd ref="8223"/><nd ref="8232"/><nd ref="8241"/><nd ref="8224"/><nd ref="16255"/><tag k="width" v="2.0"/><tag k="footway" v="sidewalk"/><tag k="highway" v="footway"/><tag k="incline" v="0.009"/><tag k="surface" v="concrete"/><tag k="ext:osm_version" v="3"/><tag k="ext:width_confidence" v="1.0"/><tag k="ext:sidewalk_corrected" v="yes"/></way>
+</osm>

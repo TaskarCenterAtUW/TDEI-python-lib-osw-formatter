@@ -34,6 +34,7 @@ class OSMWayParser(osmium.SimpleHandler):
 
         d2 = {**d, **OSWWayNormalizer(tags).normalize()}
 
+        segment_n = 0
         for i in range(len(w.nodes) - 1):
             u = w.nodes[i]
             v = w.nodes[i + 1]
@@ -49,12 +50,19 @@ class OSMWayParser(osmium.SimpleHandler):
             v_lon = float(v.lon)
             v_lat = float(v.lat)
 
+            # Skip consecutive duplicate nodes. They create zero-length segments.
+            if u_ref == v_ref:
+                del u
+                del v
+                continue
+
             d3 = {**d2}
-            d3['segment'] = i
+            d3['segment'] = segment_n
             d3['ndref'] = [u_ref, v_ref]
             self.G.add_edges_from([(u_ref, v_ref, d3)])
             self.G.add_node(u_ref, lon=u_lon, lat=u_lat)
             self.G.add_node(v_ref, lon=v_lon, lat=v_lat)
+            segment_n += 1
             del u
             del v
 
