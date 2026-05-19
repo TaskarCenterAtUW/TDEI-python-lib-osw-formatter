@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="test" upload="false">
+  <!-- Pedestrian plaza corners -->
+  <node id="1" visible="true" version="1" lat="47.6151489" lon="-122.3206583"/>
+  <node id="2" visible="true" version="1" lat="47.6149868" lon="-122.3206509"/>
+  <node id="3" visible="true" version="1" lat="47.6149898" lon="-122.3203263"/>
+  <node id="4" visible="true" version="1" lat="47.6151507" lon="-122.3203266"/>
+
+  <!-- External footway nodes (one intermediate node that should get simplified) -->
+  <node id="5" visible="true" version="1" lat="47.6153000" lon="-122.3206583"/>
+  <node id="6" visible="true" version="1" lat="47.6152500" lon="-122.3206583"/>
+  <node id="7" visible="true" version="1" lat="47.6149898" lon="-122.3201000"/>
+  <node id="8" visible="true" version="1" lat="47.6149898" lon="-122.3202000"/>
+
+  <!-- Pedestrian plaza: closed way forming a zone -->
+  <way id="100" visible="true" version="1">
+    <nd ref="1"/>
+    <nd ref="2"/>
+    <nd ref="3"/>
+    <nd ref="4"/>
+    <nd ref="1"/>
+    <tag k="highway" v="pedestrian"/>
+    <tag k="area" v="yes"/>
+    <tag k="name" v="Test Plaza"/>
+  </way>
+
+  <!-- Footway connecting external node 5 to plaza corner 1 via intermediate node 6 -->
+  <way id="200" visible="true" version="1">
+    <nd ref="5"/>
+    <nd ref="6"/>
+    <nd ref="1"/>
+    <tag k="highway" v="footway"/>
+    <tag k="footway" v="sidewalk"/>
+  </way>
+
+  <!-- Footway connecting plaza corner 3 to external node 7 via intermediate node 8 -->
+  <way id="201" visible="true" version="1">
+    <nd ref="3"/>
+    <nd ref="8"/>
+    <nd ref="7"/>
+    <tag k="highway" v="footway"/>
+    <tag k="footway" v="sidewalk"/>
+  </way>
+</osm>

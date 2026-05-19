@@ -588,6 +588,21 @@ class OSMGraph:
                 if progressbar:
                     progressbar.update(1)
                 
+        # Protect zone boundary nodes: even if they ended up in internal_nodes
+        # due to circular-way simplification edge cases, they must not be removed
+        # because zones' _w_id still references them and to_geojson() needs to
+        # remap those IDs to sequential _id values.
+        zone_boundary_ids = set()
+        for _n, _d in self.G.nodes(data=True):
+            w_ids = _d.get("_w_id")
+            if isinstance(w_ids, list):
+                for ref in w_ids:
+                    try:
+                        zone_boundary_ids.add(int(ref))
+                    except (TypeError, ValueError):
+                        pass
+        if zone_boundary_ids:
+            internal_nodes = [n for n in internal_nodes if n not in zone_boundary_ids]
         self.G.remove_nodes_from(internal_nodes)
 
     def to_undirected(self):
@@ -675,6 +690,20 @@ class OSMGraph:
         zone_features = []
         polygon_features = []
         node_id_map = {}
+        zone_node_refs = set()
+        for _, d in self.G.nodes(data=True):
+            if OSWZoneNormalizer.osw_zone_filter(d):
+                w_ids = d.get("_w_id", d.get("ndref", []))
+                if not isinstance(w_ids, list):
+                    w_ids = [w_ids]
+                for ref in w_ids:
+                    zone_node_refs.add(ref)
+                    zone_node_refs.add(str(ref))
+                    try:
+                        zone_node_refs.add(int(ref))
+                    except (TypeError, ValueError):
+                        pass
+
         for n, d in self.G.nodes(data=True):
             d_copy = {**d}
             source_id = _source_id(n)
@@ -682,8 +711,9 @@ class OSMGraph:
             geometry = mapping(geometry_obj)
             geometry_type = geometry_obj.geom_type
             is_topology_node = geometry_type == "Point" and self.G.degree(n) > 0
+            is_zone_node = geometry_type == "Point" and n in zone_node_refs
 
-            if is_topology_node:
+            if is_topology_node or is_zone_node:
                 _assign_ids(d_copy, node_id_counter, source_id)
                 node_id_map[n] = d_copy["_id"]
                 node_id_counter += 1

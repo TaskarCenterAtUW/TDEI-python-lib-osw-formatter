@@ -1,5 +1,10 @@
 # Change log
 
+### 0.3.5
+- [BUG-3665](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/3665) - Fix OSM→OSW export so zone boundary nodes are retained in `nodes.geojson` and zone `_w_id` references resolve to remapped sequential `_id`s, restoring OSW validation compliance for pedestrian-area geometries.
+- Add regression coverage that converts a `highway=pedestrian` plaza fixture and asserts `python-osw-validation` reports zero issues.
+- [ISSUE-3191](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/3191/) - Fixed Documentation  
+
 ### 0.3.4
 - Fix OSM→OSW conversion when OSM Way contains consecutive duplicate nodes (bug 3286). Instead of generating an invalid 0 length geometry, the segment is ignored.
 

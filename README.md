@@ -30,7 +30,7 @@ The conversion of OSW data to OSM is beneficial for incorporating detailed pedes
 Running the code base requires a proper Python environment set up. The following lines of code helps one establish such env named `tdei-osw`. replace `tdei-osw` with the name of your choice.
 
 ```
-conda create -n tdei-osw python==3.10.3 gdal
+conda create -n tdei-osw python=3.10 gdal
 conda activate tdei-osw
 pip install -r requirements.txt
 ```
@@ -92,24 +92,25 @@ To install the GDAL library (Geospatial Data Abstraction Library) on your system
 
 ```python  
 import asyncio
-from osm-osw-reformatter import Formatter  
+from osm_osw_reformatter import Formatter  
   
 async def osm_convert():
     f = Formatter(workdir=<OUTPUT_DIR>, file_path=<OSM_INPUT_FILE>)
-    await f.osm2osw()
+    return await f.osm2osw()
     # Uncomment below line to clean up the generated files
     # f.cleanup()
 
 
 def osw_convert():
     f = Formatter(workdir=<OUTPUT_DIR>, file_path=<OSW_INPUT_FILE>)
-    f.osw2osm()
+    return f.osw2osm()
     # Uncomment below line to clean up the generated files
     # f.cleanup()
 
 
 if __name__ == '__main__':
-    asyncio.run(osm_convert())
+    results = asyncio.run(osm_convert())
+    print(results.generated_files)
     osw_convert()  
 ```  
   
