@@ -1,44 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<osm version="0.6" generator="test" upload="false">
-  <!-- Pedestrian plaza corners -->
-  <node id="1" visible="true" version="1" lat="47.6151489" lon="-122.3206583"/>
-  <node id="2" visible="true" version="1" lat="47.6149868" lon="-122.3206509"/>
-  <node id="3" visible="true" version="1" lat="47.6149898" lon="-122.3203263"/>
-  <node id="4" visible="true" version="1" lat="47.6151507" lon="-122.3203266"/>
+<osm version="0.6" generator="osw-zone-boundary-repro">
+  <bounds minlat="47.6190" minlon="-122.3490" maxlat="47.6200" maxlon="-122.3480"/>
 
-  <!-- External footway nodes (one intermediate node that should get simplified) -->
-  <node id="5" visible="true" version="1" lat="47.6153000" lon="-122.3206583"/>
-  <node id="6" visible="true" version="1" lat="47.6152500" lon="-122.3206583"/>
-  <node id="7" visible="true" version="1" lat="47.6149898" lon="-122.3201000"/>
-  <node id="8" visible="true" version="1" lat="47.6149898" lon="-122.3202000"/>
+  <!--
+    Repro shape:
+    Node 1001 is both a pedestrian-zone boundary vertex and an ext:* custom
+    point. Before the zone-boundary export fix, it was written to points.geojson
+    instead of nodes.geojson, while zones.geojson still referenced it in _w_id.
+  -->
+  <node id="1001" visible="true" version="1" lat="47.6190" lon="-122.3490">
+    <tag k="ext:entrance" v="yes"/>
+  </node>
+  <node id="1002" visible="true" version="1" lat="47.6190" lon="-122.3480"/>
+  <node id="1003" visible="true" version="1" lat="47.6200" lon="-122.3485"/>
 
-  <!-- Pedestrian plaza: closed way forming a zone -->
-  <way id="100" visible="true" version="1">
-    <nd ref="1"/>
-    <nd ref="2"/>
-    <nd ref="3"/>
-    <nd ref="4"/>
-    <nd ref="1"/>
+  <way id="2001" visible="true" version="1">
+    <nd ref="1001"/>
+    <nd ref="1002"/>
+    <nd ref="1003"/>
+    <nd ref="1001"/>
     <tag k="highway" v="pedestrian"/>
     <tag k="area" v="yes"/>
-    <tag k="name" v="Test Plaza"/>
-  </way>
-
-  <!-- Footway connecting external node 5 to plaza corner 1 via intermediate node 6 -->
-  <way id="200" visible="true" version="1">
-    <nd ref="5"/>
-    <nd ref="6"/>
-    <nd ref="1"/>
-    <tag k="highway" v="footway"/>
-    <tag k="footway" v="sidewalk"/>
-  </way>
-
-  <!-- Footway connecting plaza corner 3 to external node 7 via intermediate node 8 -->
-  <way id="201" visible="true" version="1">
-    <nd ref="3"/>
-    <nd ref="8"/>
-    <nd ref="7"/>
-    <tag k="highway" v="footway"/>
-    <tag k="footway" v="sidewalk"/>
+    <tag k="name" v="Zone Boundary Custom Point Repro"/>
   </way>
 </osm>

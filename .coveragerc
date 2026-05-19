@@ -1,0 +1,5 @@
+[run]
+source = src
+omit =
+    src/example.py
+    src/osm_osw_reformatter/version.py
