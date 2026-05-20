@@ -1058,6 +1058,58 @@ class TestFromGeoJSON(unittest.TestCase):
             zone_w_ids = zone_data["features"][0]["properties"]["_w_id"]
             self.assertTrue(all(wid in node_ids for wid in zone_w_ids))
 
+    def test_to_geojson_zone_boundary_custom_points_stay_in_nodes_file(self):
+        graph = nx.MultiDiGraph()
+        graph.add_node(
+            10,
+            geometry=Point(0, 0),
+            lon=0.0,
+            lat=0.0,
+            **{"ext:entrance": "yes"},
+        )
+        graph.add_node(20, geometry=Point(1, 0), lon=1.0, lat=0.0)
+        graph.add_node(
+            "z100",
+            geometry=Polygon([(0, 0), (1, 0), (0, 1), (0, 0)]),
+            highway="pedestrian",
+            _w_id=["10", "20"],
+        )
+
+        osm_graph = OSMGraph(G=graph)
+
+        with TemporaryDirectory() as tmpdir:
+            nodes_path = os.path.join(tmpdir, 'nodes.geojson')
+            edges_path = os.path.join(tmpdir, 'edges.geojson')
+            points_path = os.path.join(tmpdir, 'points.geojson')
+            lines_path = os.path.join(tmpdir, 'lines.geojson')
+            zones_path = os.path.join(tmpdir, 'zones.geojson')
+            polygons_path = os.path.join(tmpdir, 'polygons.geojson')
+
+            osm_graph.to_geojson(
+                nodes_path,
+                edges_path,
+                points_path,
+                lines_path,
+                zones_path,
+                polygons_path,
+            )
+
+            with open(nodes_path) as f:
+                node_data = json.load(f)
+            with open(zones_path) as f:
+                zone_data = json.load(f)
+
+            node_ids = {feat["properties"]["_id"] for feat in node_data["features"]}
+            node_ext_ids = {
+                feat["properties"].get("ext:osm_id")
+                for feat in node_data["features"]
+            }
+            zone_w_ids = zone_data["features"][0]["properties"]["_w_id"]
+
+            self.assertIn("10", node_ext_ids)
+            self.assertFalse(os.path.exists(points_path))
+            self.assertTrue(all(wid in node_ids for wid in zone_w_ids))
+
     def test_to_undirected_on_simple_graph(self):
         g = nx.Graph()
         g.add_edge(1, 2)

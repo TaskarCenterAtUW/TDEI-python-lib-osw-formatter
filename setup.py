@@ -31,6 +31,7 @@ setup(
         'asyncio~=3.4.3',
         'networkx~=3.2',
         'shapely~=2.0.2',
+        'pyproj~=3.6.1',
         'ogr2osm==1.2.0'
     ],
     packages=find_packages(where='src'),
