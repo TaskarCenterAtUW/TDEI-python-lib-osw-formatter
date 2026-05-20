@@ -1,6 +1,8 @@
 
   
 # TDEI python lib formatter library  
+
+[![codecov](https://codecov.io/gh/TaskarCenterAtUW/TDEI-python-lib-osw-formatter/branch/main/graph/badge.svg)](https://codecov.io/gh/TaskarCenterAtUW/TDEI-python-lib-osw-formatter)
   
 This python package designed to convert geospatial data from one format to another. In this case, it converts data from OpenStreetMap (OSM) format to OpenSideWalks (OSW) format and OpenSideWalks (OSW) format to OpenStreetMap (OSM) format. Let's break down the key components and processes involved in this converter:    
     
@@ -30,7 +32,7 @@ The conversion of OSW data to OSM is beneficial for incorporating detailed pedes
 Running the code base requires a proper Python environment set up. The following lines of code helps one establish such env named `tdei-osw`. replace `tdei-osw` with the name of your choice.
 
 ```
-conda create -n tdei-osw python==3.10.3 gdal
+conda create -n tdei-osw python=3.10 gdal
 conda activate tdei-osw
 pip install -r requirements.txt
 ```
@@ -92,24 +94,25 @@ To install the GDAL library (Geospatial Data Abstraction Library) on your system
 
 ```python  
 import asyncio
-from osm-osw-reformatter import Formatter  
+from osm_osw_reformatter import Formatter  
   
 async def osm_convert():
     f = Formatter(workdir=<OUTPUT_DIR>, file_path=<OSM_INPUT_FILE>)
-    await f.osm2osw()
+    return await f.osm2osw()
     # Uncomment below line to clean up the generated files
     # f.cleanup()
 
 
 def osw_convert():
     f = Formatter(workdir=<OUTPUT_DIR>, file_path=<OSW_INPUT_FILE>)
-    f.osw2osm()
+    return f.osw2osm()
     # Uncomment below line to clean up the generated files
     # f.cleanup()
 
 
 if __name__ == '__main__':
-    asyncio.run(osm_convert())
+    results = asyncio.run(osm_convert())
+    print(results.generated_files)
     osw_convert()  
 ```  
   
@@ -141,103 +144,12 @@ folder.
 - The terminal will show the output of coverage like this  
   
 ```shell  
->  coverage run --source=src -m unittest discover -v tests/unit_tests  
-test_construct_geometries (helpers.test_osm.TestOSMHelper) ... ok
-test_count_entities_with_nodes_counter (helpers.test_osm.TestOSMHelper) ... ok
-test_count_entities_with_points_counter (helpers.test_osm.TestOSMHelper) ... ok
-test_count_entities_with_ways_counter (helpers.test_osm.TestOSMHelper) ... ok
-test_get_osm_graph (helpers.test_osm.TestOSMHelper) ... ok
-test_osw_node_filter (helpers.test_osm.TestOSMHelper) ... ok
-test_osw_point_filter (helpers.test_osm.TestOSMHelper) ... ok
-test_osw_way_filter (helpers.test_osm.TestOSMHelper) ... ok
-test_simplify_og (helpers.test_osm.TestOSMHelper) ... ok
-test_cleanup_of_temp_files (helpers.test_osw.TestOSWHelper) ... ok
-test_construct_geometries (helpers.test_osw.TestOSWHelper) ... ok
-test_count_entities_with_nodes_counter (helpers.test_osw.TestOSWHelper) ... ok
-test_count_entities_with_points_counter (helpers.test_osw.TestOSWHelper) ... ok
-test_count_entities_with_ways_counter (helpers.test_osw.TestOSWHelper) ... ok
-test_count_lines (helpers.test_osw.TestOSWHelper) ... ok
-test_count_nodes (helpers.test_osw.TestOSWHelper) ... ok
-test_count_points (helpers.test_osw.TestOSWHelper) ... ok
-test_count_polygons (helpers.test_osw.TestOSWHelper) ... ok
-test_count_ways (helpers.test_osw.TestOSWHelper) ... ok
-test_count_zones (helpers.test_osw.TestOSWHelper) ... ok
-test_get_osm_graph (helpers.test_osw.TestOSWHelper) ... ok
-test_merge (helpers.test_osw.TestOSWHelper) ... ok
-test_missing_files (helpers.test_osw.TestOSWHelper) ... ok
-test_osw_node_filter (helpers.test_osw.TestOSWHelper) ... ok
-test_osw_point_filter (helpers.test_osw.TestOSWHelper) ... ok
-test_osw_way_filter (helpers.test_osw.TestOSWHelper) ... ok
-test_simplify_og (helpers.test_osw.TestOSWHelper) ... ok
-test_unzip (helpers.test_osw.TestOSWHelper) ... ok
-test_unzip_should_return_3_files (helpers.test_osw.TestOSWHelper) ... ok
-test_custom_values (helpers.test_response.TestResponseClass) ... ok
-test_default_values (helpers.test_response.TestResponseClass) ... ok
-test_error_none (helpers.test_response.TestResponseClass) ... ok
-test_error_string (helpers.test_response.TestResponseClass) ... ok
-test_generated_files_list (helpers.test_response.TestResponseClass) ... ok
-test_generated_files_string (helpers.test_response.TestResponseClass) ... ok
-test_cleanup_existing_files (test_formatter.TestFormatter) ... ok
-test_cleanup_non_existent_files (test_formatter.TestFormatter) ... ok
-test_osm2osw_error (test_formatter.TestFormatter) ... Estimating number of ways, nodes, points, lines, zones and polygons in datasets...
-Open failed for 'test.pbf': No such file or directory
-ok
-test_osm2osw_successful (test_formatter.TestFormatter) ... Estimating number of ways, nodes, points, lines, zones and polygons in datasets...
-Creating networks from region extracts...
-Created OSW files!
-ok
-test_workdir_already_exists (test_formatter.TestFormatter) ... ok
-test_workdir_creation (test_formatter.TestFormatter) ... ok
-test_convert_error (test_osm2osw.test_osm2osw.TestOSM2OSW) ... Estimating number of ways, nodes, points, lines, zones and polygons in datasets...
-Open failed for 'test.pbf': No such file or directory
-ok
-test_convert_successful (test_osm2osw.test_osm2osw.TestOSM2OSW) ... Estimating number of ways, nodes, points, lines, zones and polygons in datasets...
-Creating networks from region extracts...
-Created OSW files!
-ok
-test_generated_3_files (test_osm2osw.test_osm2osw.TestOSM2OSW) ... Estimating number of ways, nodes, points, lines, zones and polygons in datasets...
-Creating networks from region extracts...
-Created OSW files!
-ok
-test_generated_files_are_string (test_osm2osw.test_osm2osw.TestOSM2OSW) ... Estimating number of ways, nodes, points, lines, zones and polygons in datasets...
-Creating networks from region extracts...
-Created OSW files!
-ok
-test_generated_files_include_nodes_points_edges (test_osm2osw.test_osm2osw.TestOSM2OSW) ... Estimating number of ways, nodes, points, lines, zones and polygons in datasets...
-Creating networks from region extracts...
-Created OSW files!
-ok
-test_convert_error (test_osw2osm.test_osw2osm.TestOSW2OSM) ... [Errno 2] No such file or directory: 'test.zip'
-ok
-test_convert_generated_files_are_string (test_osw2osm.test_osw2osm.TestOSW2OSM) ... ok
-test_convert_successful (test_osw2osm.test_osw2osm.TestOSW2OSM) ... ok
-test_generated_file (test_osw2osm.test_osw2osm.TestOSW2OSM) ... ok
-test_generated_file_should_be_xml (test_osw2osm.test_osw2osm.TestOSW2OSM) ... ok
-test_crossing_markings (test_serializer.test_osw_normalizer.TestCommonFunctions) ... ok
-test_incline (test_serializer.test_osw_normalizer.TestCommonFunctions) ... ok
-test_surface (test_serializer.test_osw_normalizer.TestCommonFunctions) ... ok
-test_tactile_paving (test_serializer.test_osw_normalizer.TestCommonFunctions) ... ok
-test_is_kerb (test_serializer.test_osw_normalizer.TestOSWNodeNormalizer) ... ok
-test_is_kerb_invalid (test_serializer.test_osw_normalizer.TestOSWNodeNormalizer) ... ok
-test_normalize_invalid_node (test_serializer.test_osw_normalizer.TestOSWNodeNormalizer) ... ok
-test_normalize_kerb (test_serializer.test_osw_normalizer.TestOSWNodeNormalizer) ... ok
-test_is_powerpole (test_serializer.test_osw_normalizer.TestOSWPointNormalizer) ... ok
-test_is_powerpole_invalid (test_serializer.test_osw_normalizer.TestOSWPointNormalizer) ... ok
-test_normalize_invalid_point (test_serializer.test_osw_normalizer.TestOSWPointNormalizer) ... ok
-test_normalize_powerpole (test_serializer.test_osw_normalizer.TestOSWPointNormalizer) ... ok
-test_is_crossing (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
-test_is_footway (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
-test_is_living_street (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
-test_is_pedestrian (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
-test_is_sidewalk (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
-test_is_stairs (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
-test_is_traffic_island (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
-test_normalize_crossing (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
-test_normalize_invalid_way (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
-test_normalize_sidewalk (test_serializer.test_osw_normalizer.TestOSWWayNormalizer) ... ok
+>  python -m coverage run --source=src -m unittest discover tests/unit_tests  
+.................................
+..................................
 
 ----------------------------------------------------------------------
-Ran 73 tests in 79.494s
+Ran 225 tests in 44.601s
 
 OK
 ```

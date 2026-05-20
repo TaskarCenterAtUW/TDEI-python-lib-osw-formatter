@@ -10,6 +10,7 @@ from src.osm_osw_reformatter import Formatter
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(ROOT_DIR)), 'output')
 TEST_DATA_WITH_INCLINE_ZIP_FILE = os.path.join(ROOT_DIR, 'test_files/dataset_with_incline.zip')
+TEST_ZONE_BOUNDARY_FILE = os.path.join(ROOT_DIR, 'test_files/zone_boundary.xml')
 
 
 class TestOSMCompliance(unittest.IsolatedAsyncioTestCase):
@@ -32,6 +33,25 @@ class TestOSMCompliance(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result.issues), 0, f'OSW Validation issues: {json.dumps(result.issues)}')
 
         os.remove(osm_file)
+        for f in osw_files:
+            os.remove(f)
+        os.remove(zip_path)
+        formatter.cleanup()
+
+    async def test_osm2osw_zone_boundary_is_osw_compliant(self):
+        formatter = Formatter(workdir=OUTPUT_DIR, file_path=TEST_ZONE_BOUNDARY_FILE, prefix='zone_boundary')
+        res = await formatter.osm2osw()
+        osw_files = res.generated_files
+
+        zip_path = os.path.join(OUTPUT_DIR, 'zone_boundary_osw.zip')
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for f in osw_files:
+                zipf.write(f, os.path.basename(f))
+
+        validator = OSWValidation(zipfile_path=zip_path)
+        result = validator.validate()
+        self.assertEqual(len(result.issues), 0, f'OSW Validation issues: {json.dumps(result.issues)}')
+
         for f in osw_files:
             os.remove(f)
         os.remove(zip_path)

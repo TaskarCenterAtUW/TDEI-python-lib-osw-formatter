@@ -60,6 +60,14 @@ jobs:
           python -m coverage run --source=src/osm_osw_reformatter -m unittest discover -v tests/unit_tests >> $log_file 2>&1
           echo -e "\nCoverage Report\n" >> $log_file
           coverage report >> $log_file
+          coverage xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: false
 
       - name: Check coverage
         run: |
