@@ -26,6 +26,19 @@
       "properties": {
         "_id": "613"
       }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.1631527,
+          32.7320171
+        ]
+      },
+      "properties": {
+        "_id": "1"
+      }
     }
   ]
 }
