@@ -133,6 +133,15 @@ class TestOSMProcessFeaturePost(unittest.TestCase):
 
         self.assertEqual(geometry.id, 67890)
 
+    def test_does_not_override_generated_node_id_from_internal_id_tag(self):
+        geometry = self.DummyGeometry({"_id": ["67890"]}, osm_id=12)
+        geometry.x = 1.0
+        geometry.y = 2.0
+
+        self.normalizer.process_feature_post(geometry, ogrfeature=None, ogrgeometry=None)
+
+        self.assertEqual(geometry.id, 12)
+
     def test_keeps_existing_id_when_no_tags_present(self):
         geometry = self.DummyGeometry({}, osm_id=555)
 

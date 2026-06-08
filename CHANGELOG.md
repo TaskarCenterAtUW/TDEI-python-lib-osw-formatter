@@ -1,5 +1,9 @@
 # Change log
 
+### 0.3.6
+- [BUG-3726](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/3726/) - Fix OSW→OSM conversion so duplicate source/generated node IDs do not corrupt way geometry. Way and relation references now preserve the exact `ogr2osm` node/way/relation objects during sequential ID remapping, preventing QGIS spider-line artifacts from ways snapping to unrelated duplicate node IDs.
+- Add regression coverage for overlapping OSW node IDs and generated IDs, asserting converted OSM ways keep short local segments instead of cross-map jumps.
+
 ### 0.3.5
 - [BUG-3665](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/3665) - Fix OSM→OSW export so zone boundary nodes are retained in `nodes.geojson` and zone `_w_id` references resolve to remapped sequential `_id`s, restoring OSW validation compliance for pedestrian-area geometries.
 - Add regression coverage that converts a `highway=pedestrian` plaza fixture and asserts `python-osw-validation` reports zero issues.
