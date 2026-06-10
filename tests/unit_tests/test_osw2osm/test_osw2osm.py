@@ -1,4 +1,5 @@
 import json
+import math
 import os
 from pathlib import Path
 import tempfile
@@ -14,6 +15,8 @@ TEST_WIDTH_ZIP_FILE = os.path.join(ROOT_DIR, 'test_files/width-test.zip')
 TEST_DATA_WITH_INCLINE_ZIP_FILE = os.path.join(ROOT_DIR, 'test_files/dataset_with_incline.zip')
 TEST_EDGES_WITH_INVALID_INCLINE_FILE = os.path.join(ROOT_DIR, 'test_files/edges_invalid_incline.geojson')
 TEST_NODES_WITH_INVALID_INCLINE_FILE = os.path.join(ROOT_DIR, 'test_files/nodes_invalid_incline.geojson')
+TEST_BUG_3726_NODES_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3726/nodes.geojson')
+TEST_BUG_3726_EDGES_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3726/edges.geojson')
 
 
 def _create_invalid_incline_zip(zip_path: str) -> str:
@@ -91,6 +94,15 @@ def _create_3d_node_zip(zip_path: str, z_value: float) -> str:
 
 
 class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _distance_meters(first, second):
+        lon1, lat1 = first
+        lon2, lat2 = second
+        return math.hypot(
+            (lon1 - lon2) * 111320 * math.cos(math.radians((lat1 + lat2) / 2)),
+            (lat1 - lat2) * 110540,
+        )
+
     def test_convert_successful(self):
         zip_file = TEST_ZIP_FILE
         osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
@@ -365,6 +377,33 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(way_tag_ids, ["1"])
             rel_tag_ids = [tag.get("v") for tag in root.findall(".//relation/tag[@k='_id']")]
             self.assertEqual(rel_tag_ids, ["1"])
+
+    def test_convert_preserves_way_geometry_when_osw_node_ids_overlap_generated_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            zip_path = Path(tmpdir, "overlapping_ids.zip")
+            with zipfile.ZipFile(zip_path, "w") as zf:
+                zf.write(TEST_BUG_3726_NODES_FILE, arcname="nodes.geojson")
+                zf.write(TEST_BUG_3726_EDGES_FILE, arcname="edges.geojson")
+
+            result = OSW2OSM(zip_file_path=str(zip_path), workdir=tmpdir, prefix="overlapping").convert()
+            self.assertTrue(result.status, msg=getattr(result, "error", "Conversion failed"))
+
+            root = ET.parse(result.generated_files).getroot()
+            nodes = {
+                node.get("id"): (float(node.get("lon")), float(node.get("lat")))
+                for node in root.findall(".//node")
+            }
+            node_ids = [node.get("id") for node in root.findall(".//node")]
+            self.assertEqual(len(node_ids), len(set(node_ids)))
+
+            for way in root.findall(".//way"):
+                refs = [nd.get("ref") for nd in way.findall("nd")]
+                distances = [
+                    self._distance_meters(nodes[start_ref], nodes[end_ref])
+                    for start_ref, end_ref in zip(refs, refs[1:])
+                ]
+                self.assertTrue(distances)
+                self.assertLess(max(distances), 200)
 
 
 if __name__ == '__main__':
