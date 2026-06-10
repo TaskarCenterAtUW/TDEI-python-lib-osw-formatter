@@ -2,7 +2,9 @@
   
 # TDEI python lib formatter library  
 
-[![codecov](https://codecov.io/gh/TaskarCenterAtUW/TDEI-python-lib-osw-formatter/branch/main/graph/badge.svg)](https://codecov.io/gh/TaskarCenterAtUW/TDEI-python-lib-osw-formatter)
+[![osm-osw-reformatter](https://img.shields.io/pypi/v/osm-osw-reformatter?label=osm-osw-reformatter&cacheSeconds=60&t=1)](https://pypi.org/project/osm-osw-reformatter/)
+[![Unit Tests](https://github.com/TaskarCenterAtUW/TDEI-python-lib-osw-formatter/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/TaskarCenterAtUW/TDEI-python-lib-osw-formatter/actions/workflows/unit_tests.yml)
+![Coverage](https://raw.githubusercontent.com/TaskarCenterAtUW/TDEI-python-lib-osw-formatter/badges/coverage.svg?cacheSeconds=60&t=1)
   
 This python package designed to convert geospatial data from one format to another. In this case, it converts data from OpenStreetMap (OSM) format to OpenSideWalks (OSW) format and OpenSideWalks (OSW) format to OpenStreetMap (OSM) format. Let's break down the key components and processes involved in this converter:    
     

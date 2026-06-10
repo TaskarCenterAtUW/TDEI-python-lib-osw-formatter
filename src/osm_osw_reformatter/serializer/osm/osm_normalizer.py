@@ -177,7 +177,13 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         elif '_id' in osmgeometry.tags and osmgeometry.tags['_id'][0]:
             osm_id = _as_int(osmgeometry.tags['_id'][0])
 
-        if osm_id is not None:
+        is_generated_node = (
+            hasattr(osmgeometry, "x")
+            and hasattr(osmgeometry, "y")
+            and not hasattr(osmgeometry, "nodes")
+            and not hasattr(osmgeometry, "members")
+        )
+        if osm_id is not None and not is_generated_node:
             osmgeometry.id = osm_id
         elevation = self._extract_elevation(ogrgeometry)
         if elevation is not None:
@@ -231,8 +237,11 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         references accordingly.
         """
         # Capture original IDs for mapping
+        node_identity_map = {}
         node_id_map = {}
+        way_identity_map = {}
         way_id_map = {}
+        rel_identity_map = {}
         rel_id_map = {}
         next_node_id = 1
         next_way_id = 1
@@ -279,7 +288,8 @@ class OSMNormalizer(ogr2osm.TranslationBase):
                 continue
             new_id = next_node_id
             next_node_id += 1
-            # Keep first mapping for refs that still point to source IDs.
+            node_identity_map[id(node)] = new_id
+            # Keep first mapping only as a fallback for raw integer refs.
             node_id_map.setdefault(old_id, new_id)
             node.id = new_id
             _set_id_tag(node, new_id)
@@ -290,6 +300,7 @@ class OSMNormalizer(ogr2osm.TranslationBase):
             if old_id is not None:
                 new_id = next_way_id
                 next_way_id += 1
+                way_identity_map[id(way)] = new_id
                 way_id_map.setdefault(old_id, new_id)
                 way.id = new_id
                 _set_id_tag(way, new_id)
@@ -305,11 +316,16 @@ class OSMNormalizer(ogr2osm.TranslationBase):
                             node_id_map[ref] = new_id
                         new_refs.append(node_id_map.get(ref, ref))
                     elif hasattr(ref, "id"):
-                        if ref.id not in node_id_map:
+                        ref_identity = id(ref)
+                        if ref_identity in node_identity_map:
+                            ref.id = node_identity_map[ref_identity]
+                        elif ref.id not in node_id_map:
                             new_id = next_node_id
                             next_node_id += 1
                             node_id_map[ref.id] = new_id
-                        ref.id = node_id_map.get(ref.id, ref.id)
+                            ref.id = new_id
+                        else:
+                            ref.id = node_id_map.get(ref.id, ref.id)
                         new_refs.append(ref)
                     else:
                         new_refs.append(ref)
@@ -329,6 +345,7 @@ class OSMNormalizer(ogr2osm.TranslationBase):
             if old_id is not None:
                 new_id = next_rel_id
                 next_rel_id += 1
+                rel_identity_map[id(rel)] = new_id
                 rel_id_map.setdefault(old_id, new_id)
                 rel.id = new_id
                 _set_id_tag(rel, new_id)
@@ -365,24 +382,39 @@ class OSMNormalizer(ogr2osm.TranslationBase):
                                 rel_id_map[ref] = new_id
                             member.ref = node_id_map.get(ref, way_id_map.get(ref, rel_id_map.get(ref, ref)))
                     elif hasattr(ref, "id"):
+                        ref_identity = id(ref)
                         if m_type == "node":
-                            if ref.id not in node_id_map:
+                            if ref_identity in node_identity_map:
+                                ref.id = node_identity_map[ref_identity]
+                            elif ref.id not in node_id_map:
                                 new_id = next_node_id
                                 next_node_id += 1
                                 node_id_map[ref.id] = new_id
-                            ref.id = node_id_map.get(ref.id, ref.id)
+                                ref.id = new_id
+                            else:
+                                ref.id = node_id_map.get(ref.id, ref.id)
                         elif m_type == "way":
-                            if ref.id not in way_id_map:
+                            ref_identity = id(ref)
+                            if ref_identity in way_identity_map:
+                                ref.id = way_identity_map[ref_identity]
+                            elif ref.id not in way_id_map:
                                 new_id = next_way_id
                                 next_way_id += 1
                                 way_id_map[ref.id] = new_id
-                            ref.id = way_id_map.get(ref.id, ref.id)
+                                ref.id = new_id
+                            else:
+                                ref.id = way_id_map.get(ref.id, ref.id)
                         elif m_type == "relation":
-                            if ref.id not in rel_id_map:
+                            ref_identity = id(ref)
+                            if ref_identity in rel_identity_map:
+                                ref.id = rel_identity_map[ref_identity]
+                            elif ref.id not in rel_id_map:
                                 new_id = next_rel_id
                                 next_rel_id += 1
                                 rel_id_map[ref.id] = new_id
-                            ref.id = rel_id_map.get(ref.id, ref.id)
+                                ref.id = new_id
+                            else:
+                                ref.id = rel_id_map.get(ref.id, ref.id)
                         else:
                             if ref.id not in node_id_map and ref.id not in way_id_map and ref.id not in rel_id_map:
                                 new_id = next_rel_id

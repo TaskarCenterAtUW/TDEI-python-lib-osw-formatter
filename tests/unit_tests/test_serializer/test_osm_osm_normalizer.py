@@ -228,6 +228,19 @@ class TestOSMNormalizer(unittest.TestCase):
         for idx, way in enumerate(sorted(ways, key=lambda w: w.id), start=1):
             self.assertEqual(way.tags.get('_id'), [str(idx)])
 
+    def test_process_output_preserves_object_refs_when_source_node_ids_repeat(self):
+        first_node = DummyOsmGeometry(tags={'_id': ['10']}, osm_id=10)
+        second_node = DummyOsmGeometry(tags={'_id': ['10']}, osm_id=10)
+        way = DummyOsmGeometry(tags={'_id': ['20']}, osm_id=20)
+        way.nodes = [second_node]
+
+        self.normalizer.process_output([first_node, second_node], [way], [])
+
+        self.assertEqual(first_node.id, 1)
+        self.assertEqual(second_node.id, 2)
+        self.assertIs(way.nodes[0], second_node)
+        self.assertEqual(way.nodes[0].id, 2)
+
     def test_process_output_relation_member_type_uses_correct_id_map(self):
         node = DummyOsmGeometry(tags={'_id': ['7']}, osm_id=7)
         way = DummyOsmGeometry(tags={'_id': ['7']}, osm_id=7)
