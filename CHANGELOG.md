@@ -1,5 +1,12 @@
 # Change log
 
+### 0.3.7
+- [BUG-4066](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/4066/) - Clean zero-length and collapsed coordinate geometries in both OSM→OSW and OSW→OSM conversion paths.
+- Preserve collapsed OSM edge/way data as valid custom OSW point features with original way tags stored under `ext:*`, avoiding invalid `nodes.geojson` properties.
+- Convert collapsed OSW edges, lines, polygons, and zones to OSM node fallbacks when a coordinate is available, preserving feature tags instead of silently dropping data.
+- Preserve unknown, unsupported, and invalid OSM→OSW tags under `ext:*` during normalization.
+- Add zipped OSW fixtures, OSM XML fixtures, and regression coverage for zero-length edge, line, polygon, zone, and point-preservation scenarios.
+
 ### 0.3.6
 - [BUG-3726](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/3726/) - Fix OSW→OSM conversion so duplicate source/generated node IDs do not corrupt way geometry. Way and relation references now preserve the exact `ogr2osm` node/way/relation objects during sequential ID remapping, preventing QGIS spider-line artifacts from ways snapping to unrelated duplicate node IDs.
 - Add regression coverage for overlapping OSW node IDs and generated IDs, asserting converted OSM ways keep short local segments instead of cross-map jumps.
