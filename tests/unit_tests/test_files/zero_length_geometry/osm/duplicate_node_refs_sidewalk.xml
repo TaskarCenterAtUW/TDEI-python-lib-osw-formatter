@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="zero-length-fixture">
+  <node id="1001" lat="47.60972" lon="-122.33581" version="1"/>
+  <way id="500001" version="1">
+    <nd ref="1001"/>
+    <nd ref="1001"/>
+    <tag k="highway" v="footway"/>
+    <tag k="footway" v="sidewalk"/>
+    <tag k="surface" v="concrete"/>
+    <tag k="name" v="Pike Street sidewalk"/>
+  </way>
+</osm>

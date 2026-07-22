@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="zero-length-fixture">
+  <node id="7101" lat="47.66105" lon="-122.34562" version="1"/>
+  <node id="7102" lat="47.66105" lon="-122.34562" version="1"/>
+  <way id="700001" version="1">
+    <nd ref="7101"/>
+    <nd ref="7102"/>
+    <tag k="barrier" v="fence"/>
+    <tag k="name" v="Aurora Avenue construction fence"/>
+  </way>
+</osm>

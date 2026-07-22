@@ -618,16 +618,20 @@ def check_nan_and_raise(tag_type, temp):
     
 def _normalize(tags, keep_keys, defaults):
     new_tags = {}
+    consumed_tags = set()
+    invalid_tags = set()
     for tag, tag_type in keep_keys.items():
         try:
             if isinstance(tag_type, list):
                 if isinstance(tag_type[1], (str, bool, int, float)):
                     new_tags[tag_type[0]] = tag_type[1]
+                    consumed_tags.add(tag)
                 elif isinstance(tag_type[1], types.FunctionType):
                     temp = tag_type[1](tags[tag], tags)
                     if temp is not None:
                         check_nan_and_raise(tag_type[0], temp)
                         new_tags[tag_type[0]] = temp
+                        consumed_tags.add(tag)
                     else:
                         raise ValueError
                 else:
@@ -635,16 +639,19 @@ def _normalize(tags, keep_keys, defaults):
                     if temp is not None:
                         check_nan_and_raise(tag_type[0], temp)
                         new_tags[tag_type[0]] = temp
+                        consumed_tags.add(tag)
                     else:
                         raise ValueError
             else:
                 if isinstance(tag_type, (str, bool, int, float)):
                     new_tags[tag] = tag_type
+                    consumed_tags.add(tag)
                 elif isinstance(tag_type, types.FunctionType):
                     temp = tag_type(tags[tag], tags)
                     if temp is not None:
                         check_nan_and_raise(tag_type, temp)
                         new_tags[tag] = temp
+                        consumed_tags.add(tag)
                     else:
                         raise ValueError
                 else:
@@ -652,9 +659,12 @@ def _normalize(tags, keep_keys, defaults):
                     if temp is not None:
                         check_nan_and_raise(tag_type, temp)
                         new_tags[tag] = temp
+                        consumed_tags.add(tag)
                     else:
                         raise ValueError
         except ValueError:
+            if tag in tags:
+                invalid_tags.add(tag)
             pass
         except KeyError:
             pass
@@ -662,8 +672,13 @@ def _normalize(tags, keep_keys, defaults):
     # Preserve order of keep_keys first followed by defaults
     new_tags.update(defaults)
 
-    # Keep all tags that start with "ext:"
-    ext_tags = {k: v for k, v in tags.items() if k.startswith("ext:")}
+    # Preserve non-compliant or unknown source tags under ext:*.
+    ext_tags = {}
+    for key, value in _feature_tags(tags).items():
+        if str(key).startswith("ext:"):
+            ext_tags[key] = value
+        elif key in invalid_tags or key not in consumed_tags:
+            ext_tags[f"ext:{key}"] = value
 
     return {**{**new_tags, **defaults}, **{**new_tags, **ext_tags}}
 

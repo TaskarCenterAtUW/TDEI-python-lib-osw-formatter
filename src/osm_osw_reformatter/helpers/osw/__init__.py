@@ -5,6 +5,7 @@ import zipfile
 import asyncio
 from typing import List
 from pathlib import Path
+from ...serializer.geometry_cleanup import clean_feature_geometry
 from ...serializer.osm.osm_graph import OSMGraph
 from ...serializer.counters import WayCounter, NodeCounter, PointCounter, LineCounter, ZoneCounter, PolygonCounter
 from ...serializer.osw.osw_normalizer import OSWWayNormalizer, OSWNodeNormalizer, OSWPointNormalizer, OSWLineNormalizer, \
@@ -136,7 +137,16 @@ class OSWHelper:
             if geojson_path.exists():
                 with open(geojson_path) as f:
                     region_fc = json.load(f)
-                    fc['features'] = fc['features'] + region_fc['features']
+                    for index, feature in enumerate(region_fc['features']):
+                        cleaned_feature = clean_feature_geometry(feature, collapsed_to_point=True)
+                        if cleaned_feature is None:
+                            feature_id = feature.get("properties", {}).get("_id", index)
+                            print(
+                                f"Skipped zero-length geometry in '{file}' "
+                                f"for feature '{feature_id}'."
+                            )
+                            continue
+                        fc['features'].append(cleaned_feature)
                 os.remove(geojson_path)
         output_path = Path(output, f'{prefix}.graph.all.geojson')
         with open(output_path, 'w') as f:

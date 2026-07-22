@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="zero-length-fixture">
+  <node id="7401" lat="47.60892" lon="-122.33612" version="1"/>
+  <node id="7402" lat="47.60892" lon="-122.33612" version="1"/>
+  <node id="7403" lat="47.60892" lon="-122.33612" version="1"/>
+  <way id="700004" version="1">
+    <nd ref="7401"/>
+    <nd ref="7402"/>
+    <nd ref="7403"/>
+    <nd ref="7401"/>
+    <tag k="highway" v="pedestrian"/>
+    <tag k="area" v="yes"/>
+    <tag k="surface" v="paving_stones"/>
+    <tag k="name" v="Downtown pedestrian plaza"/>
+  </way>
+</osm>

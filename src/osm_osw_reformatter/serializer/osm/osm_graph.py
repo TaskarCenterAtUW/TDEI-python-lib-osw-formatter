@@ -3,8 +3,30 @@ import json
 import pyproj
 import osmium
 import networkx as nx
-from shapely.geometry import LineString, Point, Polygon, mapping, shape
+from shapely.geometry import Point, mapping, shape
+from ..geometry_cleanup import (
+    clean_linestring_geometry,
+    clean_polygon_geometry,
+    clean_referenced_polygon_geometry,
+    coordinates_equal,
+)
 from ..osw.osw_normalizer import OSW_SCHEMA_ID, OSWPointNormalizer, OSWWayNormalizer, OSWNodeNormalizer, OSWLineNormalizer, OSWZoneNormalizer, OSWPolygonNormalizer
+
+
+def _way_tags_as_custom_point(tags: dict) -> dict:
+    point_tags = {}
+    for key, value in tags.items():
+        if key in {"lon", "lat", "geometry", "ndref", "segment"}:
+            continue
+        if key == "osm_id":
+            point_tags["ext:osm_id"] = str(value)
+        elif str(key).startswith("ext:"):
+            point_tags[key] = value
+        elif str(key).startswith("_"):
+            continue
+        else:
+            point_tags[f"ext:{key}"] = value
+    return point_tags
 
 
 class OSMWayParser(osmium.SimpleHandler):
@@ -51,7 +73,8 @@ class OSMWayParser(osmium.SimpleHandler):
             v_lat = float(v.lat)
 
             # Skip consecutive duplicate nodes. They create zero-length segments.
-            if u_ref == v_ref:
+            if u_ref == v_ref or coordinates_equal((u_lon, u_lat), (v_lon, v_lat)):
+                self.G.add_node(u_ref, lon=u_lon, lat=u_lat, **_way_tags_as_custom_point(d2))
                 del u
                 del v
                 continue
@@ -525,14 +548,19 @@ class OSMGraph:
 
         '''
         internal_nodes = []
-        for u, v, d in self.G.edges(data=True):
+        edges_to_remove = []
+        for u, v, key, d in list(self.G.edges(keys=True, data=True)):
             coords = []
             for ref in d['ndref']:
                 # FIXME: is this the best way to retrieve node attributes?
                 node_d = self.G._node[ref]
                 coords.append((node_d['lon'], node_d['lat']))
 
-            geometry = LineString(coords)
+            geometry = clean_linestring_geometry(coords)
+            if geometry is None:
+                edges_to_remove.append((u, v, key))
+                continue
+
             d['geometry'] = geometry
             d['length'] = round(self.geod.geometry_length(geometry), 1)
             internal_nodes = internal_nodes + d["ndref"][1:len(d["ndref"])-1]
@@ -540,22 +568,56 @@ class OSMGraph:
             if progressbar:
                 progressbar.update(1)
 
-        for n, d in self.G.nodes(data=True):
+        removed_edge_nodes = set()
+        for u, v, key in edges_to_remove:
+            self.G.remove_edge(u, v, key)
+            removed_edge_nodes.update((u, v))
+
+        zone_node_refs_before_cleanup = set()
+        for _n, _d in self.G.nodes(data=True):
+            w_ids = _d.get("ndref")
+            if isinstance(w_ids, list) and OSWZoneNormalizer.osw_zone_filter(_d):
+                for ref in w_ids:
+                    zone_node_refs_before_cleanup.add(ref)
+                    try:
+                        zone_node_refs_before_cleanup.add(int(ref))
+                    except (TypeError, ValueError):
+                        pass
+
+        orphan_topology_nodes = []
+        for node in removed_edge_nodes:
+            if node not in self.G.nodes:
+                continue
+            if node in zone_node_refs_before_cleanup:
+                continue
+            node_data = self.G.nodes[node]
+            if self.G.degree(node) == 0 and set(node_data.keys()).issubset({"lon", "lat"}):
+                orphan_topology_nodes.append(node)
+        if orphan_topology_nodes:
+            self.G.remove_nodes_from(orphan_topology_nodes)
+
+        nodes_to_remove = []
+        for n, d in list(self.G.nodes(data=True)):
             if OSWZoneNormalizer.osw_zone_filter(d):
                 ndref = d.get("ndref")
                 indref = d.get("indref", [])
                 if not ndref:
+                    nodes_to_remove.append(n)
                     continue
-                coords = []
+                ref_coords = []
                 for ref in ndref:
                     node_d = self.G._node[int(ref)]
-                    coords.append((node_d["lon"], node_d["lat"]))
+                    ref_coords.append((ref, (node_d["lon"], node_d["lat"])))
 
-                geometry = Polygon(coords, indref)
+                geometry, cleaned_refs = clean_referenced_polygon_geometry(ref_coords, indref)
+                if geometry is None:
+                    nodes_to_remove.append(n)
+                    continue
                 d["geometry"] = geometry
 
-                d["_w_id"] = d.pop("ndref")
+                d["_w_id"] = cleaned_refs
                 d.pop("indref", None)
+                d.pop("ndref", None)
 
                 if progressbar:
                     progressbar.update(1)
@@ -563,8 +625,12 @@ class OSMGraph:
                 ndref = d.get("ndref")
                 indref = d.get("indref", [])
                 if not ndref:
+                    nodes_to_remove.append(n)
                     continue
-                geometry = Polygon(ndref, indref)
+                geometry = clean_polygon_geometry(ndref, indref)
+                if geometry is None:
+                    nodes_to_remove.append(n)
+                    continue
                 d["geometry"] = geometry
 
                 d.pop("ndref", None)
@@ -575,8 +641,12 @@ class OSMGraph:
             elif "ndref" in d:
                 ndref = d.get("ndref")
                 if not ndref:
+                    nodes_to_remove.append(n)
                     continue
-                geometry = LineString(ndref)
+                geometry = clean_linestring_geometry(ndref)
+                if geometry is None:
+                    nodes_to_remove.append(n)
+                    continue
                 d["geometry"] = geometry
                 d["length"] = round(self.geod.geometry_length(geometry), 1)
                 d.pop("ndref", None)
@@ -588,6 +658,9 @@ class OSMGraph:
                 if progressbar:
                     progressbar.update(1)
                 
+        if nodes_to_remove:
+            self.G.remove_nodes_from(nodes_to_remove)
+
         # Protect zone boundary nodes: even if they ended up in internal_nodes
         # due to circular-way simplification edge cases, they must not be removed
         # because zones' _w_id still references them and to_geojson() needs to

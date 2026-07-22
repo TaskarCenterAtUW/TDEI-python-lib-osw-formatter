@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="zero-length-fixture">
+  <node id="7201" lat="47.67851" lon="-122.34028" version="1"/>
+  <node id="7202" lat="47.67851" lon="-122.34028" version="1"/>
+  <node id="7203" lat="47.67872" lon="-122.34010" version="1"/>
+  <way id="700002" version="1">
+    <nd ref="7201"/>
+    <nd ref="7202"/>
+    <nd ref="7203"/>
+    <tag k="natural" v="tree_row"/>
+    <tag k="leaf_type" v="broadleaved"/>
+    <tag k="name" v="Green Lake path tree row"/>
+  </way>
+</osm>
