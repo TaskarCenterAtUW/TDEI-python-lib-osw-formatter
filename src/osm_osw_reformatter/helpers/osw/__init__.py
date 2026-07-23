@@ -5,6 +5,8 @@ import zipfile
 import asyncio
 from typing import List
 from pathlib import Path
+from ...config import FormatterConfig
+from ...serializer.geometry_cleanup import clean_feature_geometry
 from ...serializer.osm.osm_graph import OSMGraph
 from ...serializer.counters import WayCounter, NodeCounter, PointCounter, LineCounter, ZoneCounter, PolygonCounter
 from ...serializer.osw.osw_normalizer import OSWWayNormalizer, OSWNodeNormalizer, OSWPointNormalizer, OSWLineNormalizer, \
@@ -92,18 +94,21 @@ class OSWHelper:
         return counter.count
 
     @staticmethod
-    async def get_osm_graph(osm_file_path: str):
+    async def get_osm_graph(osm_file_path: str, config: FormatterConfig = None, warnings=None):
         loop = asyncio.get_event_loop()
         OG = await loop.run_in_executor(
             None,
-            OSMGraph.from_osm_file,
-            osm_file_path,
-            OSWHelper.osw_way_filter,
-            OSWHelper.osw_node_filter,
-            OSWHelper.osw_point_filter,
-            OSWHelper.osw_line_filter,
-            OSWHelper.osw_zone_filter,
-            OSWHelper.osw_polygon_filter
+            lambda: OSMGraph.from_osm_file(
+                osm_file_path,
+                OSWHelper.osw_way_filter,
+                OSWHelper.osw_node_filter,
+                OSWHelper.osw_point_filter,
+                OSWHelper.osw_line_filter,
+                OSWHelper.osw_zone_filter,
+                OSWHelper.osw_polygon_filter,
+                config=config,
+                warnings=warnings,
+            )
         )
 
         gc.collect()
@@ -129,14 +134,32 @@ class OSWHelper:
             return file_locations
 
     @staticmethod
-    def merge(osm_files: object, output: str, prefix: str):
+    def merge(osm_files: object, output: str, prefix: str, config: FormatterConfig = None, warnings=None):
+        config = config or FormatterConfig()
         fc = {'type': 'FeatureCollection', 'features': []}
         for file, location in osm_files.items():
             geojson_path = Path(location)
             if geojson_path.exists():
                 with open(geojson_path) as f:
                     region_fc = json.load(f)
-                    fc['features'] = fc['features'] + region_fc['features']
+                    for index, feature in enumerate(region_fc['features']):
+                        cleaned_feature = clean_feature_geometry(
+                            feature,
+                            collapsed_to_point=True,
+                            allow_zero_length_lines=(
+                                config.allow_zero_length_lines
+                                and file in {"edges", "lines"}
+                            ),
+                            warnings=warnings,
+                        )
+                        if cleaned_feature is None:
+                            feature_id = feature.get("properties", {}).get("_id", index)
+                            print(
+                                f"Skipped zero-length geometry in '{file}' "
+                                f"for feature '{feature_id}'."
+                            )
+                            continue
+                        fc['features'].append(cleaned_feature)
                 os.remove(geojson_path)
         output_path = Path(output, f'{prefix}.graph.all.geojson')
         with open(output_path, 'w') as f:
@@ -153,9 +176,12 @@ class OSWHelper:
         await loop.run_in_executor(None, og.simplify)
 
     @classmethod
-    async def construct_geometries(cls, og):
+    async def construct_geometries(cls, og, config: FormatterConfig = None, warnings=None):
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, og.construct_geometries)
+        await loop.run_in_executor(
+            None,
+            lambda: og.construct_geometries(config=config, warnings=warnings),
+        )
 
     @classmethod
     async def write_og(cls, workdir: str, filename: str, og) -> List[str]:

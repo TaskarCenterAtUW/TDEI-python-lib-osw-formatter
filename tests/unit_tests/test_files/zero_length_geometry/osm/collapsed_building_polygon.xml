@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="zero-length-fixture">
+  <node id="7301" lat="47.61201" lon="-122.32070" version="1"/>
+  <node id="7302" lat="47.61201" lon="-122.32070" version="1"/>
+  <node id="7303" lat="47.61201" lon="-122.32070" version="1"/>
+  <way id="700003" version="1">
+    <nd ref="7301"/>
+    <nd ref="7302"/>
+    <nd ref="7303"/>
+    <nd ref="7301"/>
+    <tag k="building" v="yes"/>
+    <tag k="name" v="Broadway retail building outline"/>
+  </way>
+</osm>

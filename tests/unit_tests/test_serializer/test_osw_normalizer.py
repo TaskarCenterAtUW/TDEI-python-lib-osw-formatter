@@ -1,5 +1,6 @@
 import unittest
 import importlib.util
+import math
 from pathlib import Path
 
 module_path = Path(__file__).resolve().parents[3] / 'src/osm_osw_reformatter/serializer/osw/osw_normalizer.py'
@@ -129,7 +130,7 @@ class TestOSWWayNormalizer(unittest.TestCase):
         tags = {'highway': 'steps', 'climb': 'left'}
         normalizer = OSWWayNormalizer(tags)
         result = normalizer.normalize()
-        expected = {'highway': 'steps', 'foot': 'yes'}
+        expected = {'highway': 'steps', 'foot': 'yes', 'ext:climb': 'left'}
         self.assertEqual(result, expected)
 
     def test_normalize_invalid_way(self):
@@ -195,14 +196,14 @@ class TestOSWPointNormalizer(unittest.TestCase):
         tags = {'power': 'pole', 'barrier': 'some_barrier', 'tactile_paving': 'yes'}
         normalizer = OSWPointNormalizer(tags)
         result = normalizer.normalize()
-        expected = {'power': 'pole'}
+        expected = {'power': 'pole', 'ext:barrier': 'some_barrier', 'ext:tactile_paving': 'yes'}
         self.assertEqual(result, expected)
 
     def test_normalize_fire_hydrant(self):
         tags = {'emergency': 'fire_hydrant', 'name': 'Hydrant 42'}
         normalizer = OSWPointNormalizer(tags)
         result = normalizer.normalize()
-        expected = {'emergency': 'fire_hydrant'}
+        expected = {'emergency': 'fire_hydrant', 'ext:name': 'Hydrant 42'}
         self.assertEqual(result, expected)
 
     def test_invalid_point_is_logged_and_skipped(self):
@@ -366,6 +367,7 @@ class TestNormalizeWidthField(unittest.TestCase):
         self.assertIsInstance(normalizer, dict)
         self.assertIn('highway', normalizer)
         self.assertNotIn('width', normalizer)
+        self.assertEqual(normalizer.get('ext:width'), 'NaN')
 
     def test_removes_width_when_value_is_non_numeric_string(self):
         generic_keep_keys = {"highway": str, "width": float}
@@ -375,6 +377,7 @@ class TestNormalizeWidthField(unittest.TestCase):
         self.assertIsInstance(normalizer, dict)
         self.assertIn('highway', normalizer)
         self.assertNotIn('width', normalizer)
+        self.assertEqual(normalizer.get('ext:width'), 'hello')
 
     def test_preserves_width_when_value_is_float(self):
         generic_keep_keys = {"highway": str, "width": float}
@@ -402,6 +405,7 @@ class TestNormalizeWidthField(unittest.TestCase):
         self.assertIsInstance(normalizer, dict)
         self.assertIn('highway', normalizer)
         self.assertNotIn('width', normalizer)
+        self.assertTrue(math.isnan(normalizer.get('ext:width')))
 
     def test_preserves_width_when_value_is_float_with_string(self):
         generic_keep_keys = {"highway": str, "width": float}

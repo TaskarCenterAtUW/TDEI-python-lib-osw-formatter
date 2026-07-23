@@ -3,14 +3,45 @@ import json
 import pyproj
 import osmium
 import networkx as nx
-from shapely.geometry import LineString, Point, Polygon, mapping, shape
+from shapely.geometry import Point, mapping, shape
+from ...config import FormatterConfig
+from ..geometry_cleanup import (
+    clean_linestring_geometry,
+    clean_polygon_geometry,
+    clean_referenced_polygon_geometry,
+    coordinates_equal,
+)
 from ..osw.osw_normalizer import OSW_SCHEMA_ID, OSWPointNormalizer, OSWWayNormalizer, OSWNodeNormalizer, OSWLineNormalizer, OSWZoneNormalizer, OSWPolygonNormalizer
 
 
+def _way_tags_as_custom_point(tags: dict) -> dict:
+    point_tags = {}
+    for key, value in tags.items():
+        if key in {"lon", "lat", "geometry", "ndref", "segment"}:
+            continue
+        if key == "osm_id":
+            point_tags["ext:osm_id"] = str(value)
+        elif str(key).startswith("ext:"):
+            point_tags[key] = value
+        elif str(key).startswith("_"):
+            continue
+        else:
+            point_tags[f"ext:{key}"] = value
+    return point_tags
+
+
 class OSMWayParser(osmium.SimpleHandler):
-    def __init__(self, way_filter: Optional[callable], progressbar: Optional[callable] = None) -> None:
+    def __init__(
+        self,
+        way_filter: Optional[callable],
+        progressbar: Optional[callable] = None,
+        config: FormatterConfig = None,
+        warnings=None,
+    ) -> None:
         osmium.SimpleHandler.__init__(self)
         self.G = nx.MultiDiGraph()
+        self.config = config or FormatterConfig()
+        self.warnings = warnings
         if way_filter is None:
             self.way_filter = lambda w: True
         else:
@@ -51,7 +82,19 @@ class OSMWayParser(osmium.SimpleHandler):
             v_lat = float(v.lat)
 
             # Skip consecutive duplicate nodes. They create zero-length segments.
-            if u_ref == v_ref:
+            if u_ref == v_ref or coordinates_equal((u_lon, u_lat), (v_lon, v_lat)):
+                if self.warnings is not None:
+                    self.warnings.add_zero_length_geometry()
+                if self.config.allow_zero_length_lines:
+                    d3 = {**d2}
+                    d3['segment'] = segment_n
+                    d3['ndref'] = [u_ref, v_ref]
+                    self.G.add_edges_from([(u_ref, v_ref, d3)])
+                    self.G.add_node(u_ref, lon=u_lon, lat=u_lat)
+                    self.G.add_node(v_ref, lon=v_lon, lat=v_lat)
+                    segment_n += 1
+                else:
+                    self.G.add_node(u_ref, lon=u_lon, lat=u_lat, **_way_tags_as_custom_point(d2))
                 del u
                 del v
                 continue
@@ -377,9 +420,15 @@ class OSMGraph:
     def from_osm_file(
       self, osm_file, way_filter: Optional[callable] = None, node_filter: Optional[callable] = None,
       point_filter: Optional[callable] = None, line_filter: Optional[callable] = None, zone_filter: Optional[callable] = None, 
-      polygon_filter: Optional[callable] = None, progressbar: Optional[callable] = None
+      polygon_filter: Optional[callable] = None, progressbar: Optional[callable] = None,
+      config: FormatterConfig = None, warnings=None
     ):
-        way_parser = OSMWayParser(way_filter, progressbar=progressbar)
+        way_parser = OSMWayParser(
+            way_filter,
+            progressbar=progressbar,
+            config=config,
+            warnings=warnings,
+        )
         way_parser.apply_file(osm_file, locations=True)
         G = way_parser.G
         del way_parser
@@ -519,20 +568,35 @@ class OSMGraph:
                         pass
                 self.G.add_edges_from([(u, node_out, edge_data)])
 
-    def construct_geometries(self, progressbar: Optional[callable] = None) -> None:
+    def construct_geometries(
+        self,
+        progressbar: Optional[callable] = None,
+        config: FormatterConfig = None,
+        warnings=None,
+    ) -> None:
         '''Given the current list of node references per edge, construct
         geometry.
 
         '''
+        config = config or FormatterConfig()
         internal_nodes = []
-        for u, v, d in self.G.edges(data=True):
+        edges_to_remove = []
+        for u, v, key, d in list(self.G.edges(keys=True, data=True)):
             coords = []
             for ref in d['ndref']:
                 # FIXME: is this the best way to retrieve node attributes?
                 node_d = self.G._node[ref]
                 coords.append((node_d['lon'], node_d['lat']))
 
-            geometry = LineString(coords)
+            geometry = clean_linestring_geometry(
+                coords,
+                allow_zero_length_lines=config.allow_zero_length_lines,
+                warnings=warnings,
+            )
+            if geometry is None:
+                edges_to_remove.append((u, v, key))
+                continue
+
             d['geometry'] = geometry
             d['length'] = round(self.geod.geometry_length(geometry), 1)
             internal_nodes = internal_nodes + d["ndref"][1:len(d["ndref"])-1]
@@ -540,22 +604,60 @@ class OSMGraph:
             if progressbar:
                 progressbar.update(1)
 
-        for n, d in self.G.nodes(data=True):
+        removed_edge_nodes = set()
+        for u, v, key in edges_to_remove:
+            self.G.remove_edge(u, v, key)
+            removed_edge_nodes.update((u, v))
+
+        zone_node_refs_before_cleanup = set()
+        for _n, _d in self.G.nodes(data=True):
+            w_ids = _d.get("ndref")
+            if isinstance(w_ids, list) and OSWZoneNormalizer.osw_zone_filter(_d):
+                for ref in w_ids:
+                    zone_node_refs_before_cleanup.add(ref)
+                    try:
+                        zone_node_refs_before_cleanup.add(int(ref))
+                    except (TypeError, ValueError):
+                        pass
+
+        orphan_topology_nodes = []
+        for node in removed_edge_nodes:
+            if node not in self.G.nodes:
+                continue
+            if node in zone_node_refs_before_cleanup:
+                continue
+            node_data = self.G.nodes[node]
+            if self.G.degree(node) == 0 and set(node_data.keys()).issubset({"lon", "lat"}):
+                orphan_topology_nodes.append(node)
+        if orphan_topology_nodes:
+            self.G.remove_nodes_from(orphan_topology_nodes)
+
+        nodes_to_remove = []
+        for n, d in list(self.G.nodes(data=True)):
             if OSWZoneNormalizer.osw_zone_filter(d):
                 ndref = d.get("ndref")
                 indref = d.get("indref", [])
                 if not ndref:
+                    nodes_to_remove.append(n)
                     continue
-                coords = []
+                ref_coords = []
                 for ref in ndref:
                     node_d = self.G._node[int(ref)]
-                    coords.append((node_d["lon"], node_d["lat"]))
+                    ref_coords.append((ref, (node_d["lon"], node_d["lat"])))
 
-                geometry = Polygon(coords, indref)
+                geometry, cleaned_refs = clean_referenced_polygon_geometry(
+                    ref_coords,
+                    indref,
+                    warnings=warnings,
+                )
+                if geometry is None:
+                    nodes_to_remove.append(n)
+                    continue
                 d["geometry"] = geometry
 
-                d["_w_id"] = d.pop("ndref")
+                d["_w_id"] = cleaned_refs
                 d.pop("indref", None)
+                d.pop("ndref", None)
 
                 if progressbar:
                     progressbar.update(1)
@@ -563,8 +665,12 @@ class OSMGraph:
                 ndref = d.get("ndref")
                 indref = d.get("indref", [])
                 if not ndref:
+                    nodes_to_remove.append(n)
                     continue
-                geometry = Polygon(ndref, indref)
+                geometry = clean_polygon_geometry(ndref, indref, warnings=warnings)
+                if geometry is None:
+                    nodes_to_remove.append(n)
+                    continue
                 d["geometry"] = geometry
 
                 d.pop("ndref", None)
@@ -575,8 +681,16 @@ class OSMGraph:
             elif "ndref" in d:
                 ndref = d.get("ndref")
                 if not ndref:
+                    nodes_to_remove.append(n)
                     continue
-                geometry = LineString(ndref)
+                geometry = clean_linestring_geometry(
+                    ndref,
+                    allow_zero_length_lines=config.allow_zero_length_lines,
+                    warnings=warnings,
+                )
+                if geometry is None:
+                    nodes_to_remove.append(n)
+                    continue
                 d["geometry"] = geometry
                 d["length"] = round(self.geod.geometry_length(geometry), 1)
                 d.pop("ndref", None)
@@ -588,6 +702,9 @@ class OSMGraph:
                 if progressbar:
                     progressbar.update(1)
                 
+        if nodes_to_remove:
+            self.G.remove_nodes_from(nodes_to_remove)
+
         # Protect zone boundary nodes: even if they ended up in internal_nodes
         # due to circular-way simplification edge cases, they must not be removed
         # because zones' _w_id still references them and to_geojson() needs to
