@@ -6,6 +6,12 @@
 - Convert collapsed OSW edges, lines, polygons, and zones to OSM node fallbacks when a coordinate is available, preserving feature tags instead of silently dropping data.
 - Preserve unknown, unsupported, and invalid OSM→OSW tags under `ext:*` during normalization.
 - Add zipped OSW fixtures, OSM XML fixtures, and regression coverage for zero-length edge, line, polygon, zone, and point-preservation scenarios.
+- [BUG-4069](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/4069/) - Add formatter configuration for `coordinate_precision` and `allow_zero_length_lines`, matching validator defaults and type checks.
+- Add non-blocking `Response.warnings` output for coordinate precision and zero-length geometry handling in both OSM→OSW and OSW→OSM conversion paths.
+- Keep coordinate precision warnings configurable without modifying generated coordinates.
+- Allow zero-length LineString features only when configured; polygons and zones still require valid non-zero-area geometry.
+- Add unit coverage for config validation, warning output, precision warnings, and zero-length line configuration behavior.
+- [BUG-4070](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/4070/) - Return conversion errors when no output files are generated or generated OSM XML contains no OSM entities.
 
 ### 0.3.6
 - [BUG-3726](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/3726/) - Fix OSW→OSM conversion so duplicate source/generated node IDs do not corrupt way geometry. Way and relation references now preserve the exact `ogr2osm` node/way/relation objects during sequential ID remapping, preventing QGIS spider-line artifacts from ways snapping to unrelated duplicate node IDs.

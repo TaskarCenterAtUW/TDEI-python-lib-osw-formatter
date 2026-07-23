@@ -4,6 +4,7 @@ import pyproj
 import osmium
 import networkx as nx
 from shapely.geometry import Point, mapping, shape
+from ...config import FormatterConfig
 from ..geometry_cleanup import (
     clean_linestring_geometry,
     clean_polygon_geometry,
@@ -30,9 +31,17 @@ def _way_tags_as_custom_point(tags: dict) -> dict:
 
 
 class OSMWayParser(osmium.SimpleHandler):
-    def __init__(self, way_filter: Optional[callable], progressbar: Optional[callable] = None) -> None:
+    def __init__(
+        self,
+        way_filter: Optional[callable],
+        progressbar: Optional[callable] = None,
+        config: FormatterConfig = None,
+        warnings=None,
+    ) -> None:
         osmium.SimpleHandler.__init__(self)
         self.G = nx.MultiDiGraph()
+        self.config = config or FormatterConfig()
+        self.warnings = warnings
         if way_filter is None:
             self.way_filter = lambda w: True
         else:
@@ -74,7 +83,18 @@ class OSMWayParser(osmium.SimpleHandler):
 
             # Skip consecutive duplicate nodes. They create zero-length segments.
             if u_ref == v_ref or coordinates_equal((u_lon, u_lat), (v_lon, v_lat)):
-                self.G.add_node(u_ref, lon=u_lon, lat=u_lat, **_way_tags_as_custom_point(d2))
+                if self.warnings is not None:
+                    self.warnings.add_zero_length_geometry()
+                if self.config.allow_zero_length_lines:
+                    d3 = {**d2}
+                    d3['segment'] = segment_n
+                    d3['ndref'] = [u_ref, v_ref]
+                    self.G.add_edges_from([(u_ref, v_ref, d3)])
+                    self.G.add_node(u_ref, lon=u_lon, lat=u_lat)
+                    self.G.add_node(v_ref, lon=v_lon, lat=v_lat)
+                    segment_n += 1
+                else:
+                    self.G.add_node(u_ref, lon=u_lon, lat=u_lat, **_way_tags_as_custom_point(d2))
                 del u
                 del v
                 continue
@@ -400,9 +420,15 @@ class OSMGraph:
     def from_osm_file(
       self, osm_file, way_filter: Optional[callable] = None, node_filter: Optional[callable] = None,
       point_filter: Optional[callable] = None, line_filter: Optional[callable] = None, zone_filter: Optional[callable] = None, 
-      polygon_filter: Optional[callable] = None, progressbar: Optional[callable] = None
+      polygon_filter: Optional[callable] = None, progressbar: Optional[callable] = None,
+      config: FormatterConfig = None, warnings=None
     ):
-        way_parser = OSMWayParser(way_filter, progressbar=progressbar)
+        way_parser = OSMWayParser(
+            way_filter,
+            progressbar=progressbar,
+            config=config,
+            warnings=warnings,
+        )
         way_parser.apply_file(osm_file, locations=True)
         G = way_parser.G
         del way_parser
@@ -542,11 +568,17 @@ class OSMGraph:
                         pass
                 self.G.add_edges_from([(u, node_out, edge_data)])
 
-    def construct_geometries(self, progressbar: Optional[callable] = None) -> None:
+    def construct_geometries(
+        self,
+        progressbar: Optional[callable] = None,
+        config: FormatterConfig = None,
+        warnings=None,
+    ) -> None:
         '''Given the current list of node references per edge, construct
         geometry.
 
         '''
+        config = config or FormatterConfig()
         internal_nodes = []
         edges_to_remove = []
         for u, v, key, d in list(self.G.edges(keys=True, data=True)):
@@ -556,7 +588,11 @@ class OSMGraph:
                 node_d = self.G._node[ref]
                 coords.append((node_d['lon'], node_d['lat']))
 
-            geometry = clean_linestring_geometry(coords)
+            geometry = clean_linestring_geometry(
+                coords,
+                allow_zero_length_lines=config.allow_zero_length_lines,
+                warnings=warnings,
+            )
             if geometry is None:
                 edges_to_remove.append((u, v, key))
                 continue
@@ -609,7 +645,11 @@ class OSMGraph:
                     node_d = self.G._node[int(ref)]
                     ref_coords.append((ref, (node_d["lon"], node_d["lat"])))
 
-                geometry, cleaned_refs = clean_referenced_polygon_geometry(ref_coords, indref)
+                geometry, cleaned_refs = clean_referenced_polygon_geometry(
+                    ref_coords,
+                    indref,
+                    warnings=warnings,
+                )
                 if geometry is None:
                     nodes_to_remove.append(n)
                     continue
@@ -627,7 +667,7 @@ class OSMGraph:
                 if not ndref:
                     nodes_to_remove.append(n)
                     continue
-                geometry = clean_polygon_geometry(ndref, indref)
+                geometry = clean_polygon_geometry(ndref, indref, warnings=warnings)
                 if geometry is None:
                     nodes_to_remove.append(n)
                     continue
@@ -643,7 +683,11 @@ class OSMGraph:
                 if not ndref:
                     nodes_to_remove.append(n)
                     continue
-                geometry = clean_linestring_geometry(ndref)
+                geometry = clean_linestring_geometry(
+                    ndref,
+                    allow_zero_length_lines=config.allow_zero_length_lines,
+                    warnings=warnings,
+                )
                 if geometry is None:
                     nodes_to_remove.append(n)
                     continue

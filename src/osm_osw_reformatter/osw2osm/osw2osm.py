@@ -2,21 +2,45 @@ import gc
 import ogr2osm
 from xml.etree import ElementTree as ET
 from pathlib import Path
+from ..config import FormatterConfig
 from ..helpers.osw import OSWHelper
+from ..helpers.output_validation import (
+    ConversionOutputError,
+    ensure_generated_files,
+    ensure_osm_xml_has_entities,
+)
 from ..helpers.response import Response
+from ..helpers.warnings import WarningCollector, input_file_has_excess_coordinate_precision
 from ..serializer.osm.osm_normalizer import OSMNormalizer
 
 
 class OSW2OSM:
-    def __init__(self, zip_file_path: str, workdir: str, prefix: str):
+    def __init__(self, zip_file_path: str, workdir: str, prefix: str, config: FormatterConfig = None):
         self.zip_path = str(Path(zip_file_path))
         self.workdir = workdir
         self.prefix = prefix
+        if config is not None and not isinstance(config, FormatterConfig):
+            raise TypeError("config must be a FormatterConfig instance.")
+        self.config = config or FormatterConfig()
 
     def convert(self) -> Response:
+        warnings = WarningCollector(self.config.coordinate_precision)
         try:
             unzipped_files = OSWHelper.unzip(self.zip_path, self.workdir)
-            input_file = OSWHelper.merge(osm_files=unzipped_files, output=self.workdir, prefix=self.prefix)
+            for file_path in unzipped_files.values():
+                if input_file_has_excess_coordinate_precision(
+                    file_path,
+                    self.config.coordinate_precision,
+                ):
+                    warnings.add_coordinate_precision()
+                    break
+            input_file = OSWHelper.merge(
+                osm_files=unzipped_files,
+                output=self.workdir,
+                prefix=self.prefix,
+                config=self.config,
+                warnings=warnings,
+            )
             output_file = Path(self.workdir, f'{self.prefix}.graph.osm.xml')
 
             # Create the translation object.
@@ -35,6 +59,8 @@ class OSW2OSM:
             osm_data.output(data_writer)
             self._ensure_version_attribute(output_file)
             self._remap_ids_to_sequential(output_file)
+            ensure_generated_files(str(output_file), require_existing=True)
+            ensure_osm_xml_has_entities(output_file)
 
             del translation_object
             del datasource
@@ -42,10 +68,17 @@ class OSW2OSM:
             del data_writer
             # Delete merge file
             Path(input_file).unlink()
-            resp = Response(status=True, generated_files=str(output_file))
+            resp = Response(
+                status=True,
+                generated_files=str(output_file),
+                warnings=warnings.to_string(),
+            )
+        except ConversionOutputError as error:
+            print(f'Error during conversion: {error}')
+            resp = Response(status=False, error=str(error), warnings=warnings.to_string())
         except Exception as error:
             print(f'Error during conversion: {error}')
-            resp = Response(status=False, error=str(error))
+            resp = Response(status=False, error=str(error), warnings=warnings.to_string())
         finally:
             gc.collect()
         return resp
