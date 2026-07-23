@@ -87,6 +87,28 @@ To install the GDAL library (Geospatial Data Abstraction Library) on your system
   - Polygon geometries → `polygons.geojson` with `_id` and `ext:*`.
 - Outputs are formatted with indentation to simplify inspection.
 
+## Formatter configuration and response
+
+The formatter supports optional conversion configuration through `FormatterConfig`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `coordinate_precision` | `7` | Maximum coordinate decimal places before a non-blocking warning is returned. Output coordinates are not modified by this setting. |
+| `allow_zero_length_lines` | `False` | Allows zero-length LineString geometries for line-based datasets when set to `True`. This does not apply to polygons or zones, which must still have valid non-zero-area geometry. |
+
+Conversion returns a `Response` object:
+
+| Field | Description |
+|-------|-------------|
+| `status` | `True` when conversion succeeds, `False` when conversion fails. |
+| `generated_files` | Output file path or list of output file paths. |
+| `error` | Error message when `status` is `False`. |
+| `warnings` | Non-blocking warning text. Warnings do not change generated data or conversion status. |
+
+Warnings may be returned when input coordinates exceed the configured precision or when duplicate/collapsed coordinate geometry is found. For duplicate or collapsed geometry, the formatter may remove repeated coordinate vertices, omit geometries that cannot form a valid line or polygon, preserve zero-length LineStrings only when `allow_zero_length_lines=True`, or convert collapsed features to point output when possible.
+
+Conversion returns `status=False` when no output files are generated, or when OSW → OSM generates an OSM XML file with no `node`, `way`, or `relation` elements.
+
   
 ## Starting a new project with template  
   
@@ -96,10 +118,14 @@ To install the GDAL library (Geospatial Data Abstraction Library) on your system
 
 ```python  
 import asyncio
-from osm_osw_reformatter import Formatter  
+from osm_osw_reformatter import Formatter, FormatterConfig
   
 async def osm_convert():
-    f = Formatter(workdir=<OUTPUT_DIR>, file_path=<OSM_INPUT_FILE>)
+    config = FormatterConfig(
+        coordinate_precision=7,
+        allow_zero_length_lines=False,
+    )
+    f = Formatter(workdir=<OUTPUT_DIR>, file_path=<OSM_INPUT_FILE>, config=config)
     return await f.osm2osw()
     # Uncomment below line to clean up the generated files
     # f.cleanup()
@@ -114,7 +140,12 @@ def osw_convert():
 
 if __name__ == '__main__':
     results = asyncio.run(osm_convert())
-    print(results.generated_files)
+    if results.status:
+        print(results.generated_files)
+    else:
+        print(results.error)
+    if results.warnings:
+        print(results.warnings)
     osw_convert()  
 ```  
   

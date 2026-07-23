@@ -13,6 +13,10 @@ is_exists = os.path.exists(OUTPUT_DIR)
 if not is_exists:
     os.makedirs(OUTPUT_DIR)
 
+config = FormatterConfig(
+        coordinate_precision=7,
+        allow_zero_length_lines=True,
+    )
 
 async def osm_convert():
     f = Formatter(workdir=OUTPUT_DIR, file_path=OSM_INPUT_FILE)
@@ -23,7 +27,8 @@ async def osm_convert():
 
 def osw_convert():
     f = Formatter(workdir=OUTPUT_DIR, file_path=OSW_INPUT_FILE)
-    f.osw2osm()
+    results = f.osw2osm()
+    print(results.warnings)
     # Uncomment below line to clean up the generated files
     # f.cleanup()
 

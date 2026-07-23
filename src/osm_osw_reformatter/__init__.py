@@ -2,6 +2,11 @@ import os
 from pathlib import Path
 from .osm2osw.osm2osw import OSM2OSW
 from .osw2osm.osw2osm import OSW2OSM
+from .config import (
+    DEFAULT_ALLOW_ZERO_LENGTH_LINES,
+    DEFAULT_COORDINATE_PRECISION,
+    FormatterConfig,
+)
 from .helpers.response import Response
 from .version import __version__
 
@@ -11,23 +16,57 @@ DOWNLOAD_FOLDER = f'{Path.cwd()}/tmp'
 
 
 class Formatter:
-    def __init__(self, workdir=DOWNLOAD_FOLDER, file_path=None, prefix='final'):
+    def __init__(
+        self,
+        workdir=DOWNLOAD_FOLDER,
+        file_path=None,
+        prefix='final',
+        config: FormatterConfig = None,
+        coordinate_precision: int = None,
+        allow_zero_length_lines: bool = None,
+    ):
         is_exists = os.path.exists(workdir)
         if not is_exists:
             os.makedirs(workdir)
+        if config is not None and not isinstance(config, FormatterConfig):
+            raise TypeError("config must be a FormatterConfig instance.")
+        if config is None:
+            config = FormatterConfig(
+                coordinate_precision=(
+                    DEFAULT_COORDINATE_PRECISION
+                    if coordinate_precision is None
+                    else coordinate_precision
+                ),
+                allow_zero_length_lines=(
+                    DEFAULT_ALLOW_ZERO_LENGTH_LINES
+                    if allow_zero_length_lines is None
+                    else allow_zero_length_lines
+                ),
+            )
         self.workdir = workdir
         self.file_path = file_path
         self.generated_files = []
         self.prefix = prefix
+        self.config = config
 
     async def osm2osw(self) -> Response:
-        convert = OSM2OSW(osm_file=self.file_path, workdir=self.workdir, prefix=self.prefix)
+        convert = OSM2OSW(
+            osm_file=self.file_path,
+            workdir=self.workdir,
+            prefix=self.prefix,
+            config=self.config,
+        )
         result = await convert.convert()
         self.generated_files = result.generated_files
         return result
 
     def osw2osm(self) -> Response:
-        convert = OSW2OSM(zip_file_path=self.file_path, workdir=self.workdir, prefix=self.prefix)
+        convert = OSW2OSM(
+            zip_file_path=self.file_path,
+            workdir=self.workdir,
+            prefix=self.prefix,
+            config=self.config,
+        )
         result = convert.convert()
         self.generated_files = [result.generated_files]
         return result
