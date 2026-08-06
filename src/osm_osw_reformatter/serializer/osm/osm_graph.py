@@ -36,12 +36,10 @@ class OSMWayParser(osmium.SimpleHandler):
         way_filter: Optional[callable],
         progressbar: Optional[callable] = None,
         config: FormatterConfig = None,
-        warnings=None,
     ) -> None:
         osmium.SimpleHandler.__init__(self)
         self.G = nx.MultiDiGraph()
         self.config = config or FormatterConfig()
-        self.warnings = warnings
         if way_filter is None:
             self.way_filter = lambda w: True
         else:
@@ -83,8 +81,6 @@ class OSMWayParser(osmium.SimpleHandler):
 
             # Skip consecutive duplicate nodes. They create zero-length segments.
             if u_ref == v_ref or coordinates_equal((u_lon, u_lat), (v_lon, v_lat)):
-                if self.warnings is not None:
-                    self.warnings.add_zero_length_geometry()
                 if self.config.allow_zero_length_lines:
                     d3 = {**d2}
                     d3['segment'] = segment_n
@@ -421,13 +417,12 @@ class OSMGraph:
       self, osm_file, way_filter: Optional[callable] = None, node_filter: Optional[callable] = None,
       point_filter: Optional[callable] = None, line_filter: Optional[callable] = None, zone_filter: Optional[callable] = None, 
       polygon_filter: Optional[callable] = None, progressbar: Optional[callable] = None,
-      config: FormatterConfig = None, warnings=None
+      config: FormatterConfig = None
     ):
         way_parser = OSMWayParser(
             way_filter,
             progressbar=progressbar,
             config=config,
-            warnings=warnings,
         )
         way_parser.apply_file(osm_file, locations=True)
         G = way_parser.G
@@ -493,6 +488,12 @@ class OSMGraph:
 
             predecessors = list(self.G.predecessors(node))
             successors = list(self.G.successors(node))
+
+            if node in predecessors or node in successors:
+                # A zero-length edge is a self-loop, so the node looks like a
+                # degree-2 continuation of its own way. Splicing it in would
+                # make it an internal node and delete both it and the edge.
+                continue
 
             if (len(predecessors) == 1) and (len(successors) == 1):
                 # Only one predecessor and one successor - ideal internal node
@@ -572,7 +573,6 @@ class OSMGraph:
         self,
         progressbar: Optional[callable] = None,
         config: FormatterConfig = None,
-        warnings=None,
     ) -> None:
         '''Given the current list of node references per edge, construct
         geometry.
@@ -591,7 +591,6 @@ class OSMGraph:
             geometry = clean_linestring_geometry(
                 coords,
                 allow_zero_length_lines=config.allow_zero_length_lines,
-                warnings=warnings,
             )
             if geometry is None:
                 edges_to_remove.append((u, v, key))
@@ -648,7 +647,6 @@ class OSMGraph:
                 geometry, cleaned_refs = clean_referenced_polygon_geometry(
                     ref_coords,
                     indref,
-                    warnings=warnings,
                 )
                 if geometry is None:
                     nodes_to_remove.append(n)
@@ -667,7 +665,7 @@ class OSMGraph:
                 if not ndref:
                     nodes_to_remove.append(n)
                     continue
-                geometry = clean_polygon_geometry(ndref, indref, warnings=warnings)
+                geometry = clean_polygon_geometry(ndref, indref)
                 if geometry is None:
                     nodes_to_remove.append(n)
                     continue
@@ -686,7 +684,6 @@ class OSMGraph:
                 geometry = clean_linestring_geometry(
                     ndref,
                     allow_zero_length_lines=config.allow_zero_length_lines,
-                    warnings=warnings,
                 )
                 if geometry is None:
                     nodes_to_remove.append(n)

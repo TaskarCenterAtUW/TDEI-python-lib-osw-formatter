@@ -4,10 +4,19 @@ import asyncio
 import traceback
 from pathlib import Path
 from ..config import FormatterConfig
+from ..helpers.input_validation import (
+    OSMCoordinatePrecisionError,
+    OSMFileCorruptError,
+    is_osm_parse_failure,
+    validate_osm_input,
+)
 from ..helpers.osw import OSWHelper
-from ..helpers.output_validation import ConversionOutputError, ensure_generated_files
+from ..helpers.output_validation import (
+    ConversionOutputError,
+    ensure_generated_files,
+    validate_osw_output,
+)
 from ..helpers.response import Response
-from ..helpers.warnings import WarningCollector, input_file_has_excess_coordinate_precision
 
 
 class OSM2OSW:
@@ -22,33 +31,37 @@ class OSM2OSW:
         self.config = config or FormatterConfig()
 
     async def convert(self) -> Response:
-        warnings = WarningCollector(self.config.coordinate_precision)
         try:
-            if input_file_has_excess_coordinate_precision(
-                self.osm_file_path,
-                self.config.coordinate_precision,
-            ):
-                warnings.add_coordinate_precision()
+            if self.config.validate_input:
+                validate_osm_input(self.osm_file_path, config=self.config)
 
             print('Creating networks from region extracts...')
             tasks = [
                 OSWHelper.get_osm_graph(
                     self.osm_file_path,
                     config=self.config,
-                    warnings=warnings,
                 )
             ]
-            osm_graph_results = await asyncio.gather(*tasks)
+            try:
+                osm_graph_results = await asyncio.gather(*tasks)
+            except RuntimeError as error:
+                # The reader raises RuntimeError both for unreadable files and
+                # for complaints about the data; only the former is corruption.
+                if is_osm_parse_failure(error):
+                    raise OSMFileCorruptError(str(error)) from error
+                raise
             osm_graph_results = list(osm_graph_results)
             OG = osm_graph_results[0]
 
             await OSWHelper.simplify_og(OG)
-            await OSWHelper.construct_geometries(OG, config=self.config, warnings=warnings)
+            await OSWHelper.construct_geometries(OG, config=self.config)
 
             # for OG in osm_graph_results:
             generated_files = await OSWHelper.write_og(self.workdir, self.filename, OG)
             self.generated_files = generated_files
             ensure_generated_files(generated_files, require_existing=True)
+            if self.config.validate_output:
+                validate_osw_output(generated_files, config=self.config)
 
             print(f'Created OSW files!')
 
@@ -59,7 +72,13 @@ class OSM2OSW:
             resp = Response(
                 status=True,
                 generated_files=self.generated_files,
-                warnings=warnings.to_string(),
+            )
+        except (OSMCoordinatePrecisionError, OSMFileCorruptError) as error:
+            print(f'Invalid OSM input: {error}')
+            resp = Response(
+                status=False,
+                generated_files=self.generated_files,
+                error=str(error),
             )
         except ConversionOutputError as error:
             print(error)
@@ -67,7 +86,6 @@ class OSM2OSW:
                 status=False,
                 generated_files=self.generated_files,
                 error=str(error),
-                warnings=warnings.to_string(),
             )
         except Exception as error:
             traceback.print_exc()
@@ -76,7 +94,6 @@ class OSM2OSW:
                 status=False,
                 generated_files=self.generated_files,
                 error=str(error),
-                warnings=warnings.to_string(),
             )
         finally:
             gc.collect()

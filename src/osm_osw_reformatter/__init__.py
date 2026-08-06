@@ -5,6 +5,8 @@ from .osw2osm.osw2osm import OSW2OSM
 from .config import (
     DEFAULT_ALLOW_ZERO_LENGTH_LINES,
     DEFAULT_COORDINATE_PRECISION,
+    DEFAULT_VALIDATE_INPUT,
+    DEFAULT_VALIDATE_OUTPUT,
     FormatterConfig,
 )
 from .helpers.response import Response
@@ -24,6 +26,8 @@ class Formatter:
         config: FormatterConfig = None,
         coordinate_precision: int = None,
         allow_zero_length_lines: bool = None,
+        validate_input: bool = None,
+        validate_output: bool = None,
     ):
         is_exists = os.path.exists(workdir)
         if not is_exists:
@@ -41,6 +45,16 @@ class Formatter:
                     DEFAULT_ALLOW_ZERO_LENGTH_LINES
                     if allow_zero_length_lines is None
                     else allow_zero_length_lines
+                ),
+                validate_input=(
+                    DEFAULT_VALIDATE_INPUT
+                    if validate_input is None
+                    else validate_input
+                ),
+                validate_output=(
+                    DEFAULT_VALIDATE_OUTPUT
+                    if validate_output is None
+                    else validate_output
                 ),
             )
         self.workdir = workdir

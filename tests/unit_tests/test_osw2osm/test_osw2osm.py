@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import zipfile
 import unittest
+from src.osm_osw_reformatter.config import FormatterConfig
 from src.osm_osw_reformatter.osw2osm.osw2osm import OSW2OSM
 import xml.etree.ElementTree as ET
 
@@ -17,6 +18,12 @@ TEST_EDGES_WITH_INVALID_INCLINE_FILE = os.path.join(ROOT_DIR, 'test_files/edges_
 TEST_NODES_WITH_INVALID_INCLINE_FILE = os.path.join(ROOT_DIR, 'test_files/nodes_invalid_incline.geojson')
 TEST_BUG_3726_NODES_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3726/nodes.geojson')
 TEST_BUG_3726_EDGES_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3726/edges.geojson')
+TEST_DUPLICATE_POINTS_ZIP_FILE = os.path.join(ROOT_DIR, 'test_files/input_validation/duplicate_points.zip')
+TEST_VALID_OSW_ZIP_FILE = os.path.join(ROOT_DIR, 'test_files/input_validation/valid_osw.zip')
+
+# These fixtures are deliberately non-compliant OSW datasets: they exercise
+# conversion behavior, so input validation is switched off for them.
+NO_INPUT_VALIDATION = FormatterConfig(validate_input=False)
 
 
 def _create_invalid_incline_zip(zip_path: str) -> str:
@@ -105,28 +112,28 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
     def test_convert_successful(self):
         zip_file = TEST_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
         self.assertTrue(result.status)
         os.remove(result.generated_files)
 
     def test_generated_file(self):
         zip_file = TEST_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
         self.assertEqual(len([result.generated_files]), 1)
         os.remove(result.generated_files)
 
     def test_generated_file_should_be_xml(self):
         zip_file = TEST_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
         self.assertTrue(result.generated_files.endswith('.xml'))
         os.remove(result.generated_files)
 
     def test_generated_file_should_be_xml_and_valid_width_tag(self):
         zip_file = TEST_WIDTH_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
         self.assertTrue(result.generated_files.endswith('.xml'))
         xml_file_path = result.generated_files
@@ -147,19 +154,19 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
     def test_convert_generated_files_are_string(self):
         zip_file = TEST_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
         self.assertIsInstance(result.generated_files, str)
         os.remove(result.generated_files)
 
     async def test_convert_error(self):
-        osw2osm = OSW2OSM(zip_file_path='test.zip', workdir=OUTPUT_DIR, prefix='test')
+        osw2osm = OSW2OSM(zip_file_path='test.zip', workdir=OUTPUT_DIR, prefix='test', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
         self.assertFalse(result.status)
 
     def test_generated_file_does_not_contain_climb_tag(self):
         zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
         xml_file_path = result.generated_files
 
@@ -171,7 +178,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
     def test_generated_file_contains_incline_tag(self):
         zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
         xml_file_path = result.generated_files
 
@@ -183,7 +190,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
     def test_incline_tags_do_not_have_climb(self):
         zip_file = TEST_DATA_WITH_INCLINE_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='test', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
         xml_file_path = result.generated_files
 
@@ -200,7 +207,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
     def test_invalid_incline_values_are_excluded(self):
         zip_path = os.path.join(OUTPUT_DIR, 'dataset_with_invalid_incline.zip')
         zip_file = _create_invalid_incline_zip(zip_path)
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='invalid')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='invalid', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
 
         # Ensure conversion succeeded so the XML file path is valid
@@ -225,7 +232,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
     def test_osm_elements_have_version_attribute(self):
         zip_file = TEST_WIDTH_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='version')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='version', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
 
         tree = ET.parse(result.generated_files)
@@ -274,7 +281,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
             "metadata": {"color": "blue"}
         }
         zip_file = _create_custom_property_zip(zip_path, props)
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='custom')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='custom', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
 
         tree = ET.parse(result.generated_files)
@@ -296,7 +303,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
     def test_3d_coordinates_promoted_to_ext_elevation(self):
         zip_path = os.path.join(OUTPUT_DIR, 'dataset_with_3d_node.zip')
         zip_file = _create_3d_node_zip(zip_path, 0.0)
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='elevation')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='elevation', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
 
         self.assertTrue(result.status, msg=getattr(result, 'error', 'Conversion failed'))
@@ -317,7 +324,7 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
 
     def test_ids_are_sequential_per_type(self):
         zip_file = TEST_WIDTH_ZIP_FILE
-        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='sequential')
+        osw2osm = OSW2OSM(zip_file_path=zip_file, workdir=OUTPUT_DIR, prefix='sequential', config=NO_INPUT_VALIDATION)
         result = osw2osm.convert()
 
         OSW2OSM._remap_ids_to_sequential(Path(result.generated_files))
@@ -385,7 +392,12 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
                 zf.write(TEST_BUG_3726_NODES_FILE, arcname="nodes.geojson")
                 zf.write(TEST_BUG_3726_EDGES_FILE, arcname="edges.geojson")
 
-            result = OSW2OSM(zip_file_path=str(zip_path), workdir=tmpdir, prefix="overlapping").convert()
+            result = OSW2OSM(
+                zip_file_path=str(zip_path),
+                workdir=tmpdir,
+                prefix="overlapping",
+                config=NO_INPUT_VALIDATION,
+            ).convert()
             self.assertTrue(result.status, msg=getattr(result, "error", "Conversion failed"))
 
             root = ET.parse(result.generated_files).getroot()
@@ -404,6 +416,71 @@ class TestOSW2OSM(unittest.IsolatedAsyncioTestCase):
                 ]
                 self.assertTrue(distances)
                 self.assertLess(max(distances), 200)
+
+    @staticmethod
+    def _nodes_tagged(root, key, value):
+        return [
+            node for node in root.findall('.//node')
+            if any(t.get('k') == key and t.get('v') == value for t in node.findall('tag'))
+        ]
+
+    def test_co_located_points_are_kept_apart_by_default(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = OSW2OSM(
+                zip_file_path=TEST_DUPLICATE_POINTS_ZIP_FILE,
+                workdir=tmpdir,
+                prefix='duplicate',
+            ).convert()
+
+            self.assertTrue(result.status, msg=result.error)
+            root = ET.parse(result.generated_files).getroot()
+
+        # Identical tags at an identical location still stay two separate nodes.
+        benches = self._nodes_tagged(root, 'amenity', 'bench')
+        self.assertEqual(len(benches), 2)
+        coordinates = {(node.get('lat'), node.get('lon')) for node in benches}
+        self.assertEqual(len(coordinates), 1, 'The two benches should share a location')
+
+    def test_co_located_points_are_merged_when_zero_length_lines_are_disallowed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = OSW2OSM(
+                zip_file_path=TEST_DUPLICATE_POINTS_ZIP_FILE,
+                workdir=tmpdir,
+                prefix='duplicate',
+                config=FormatterConfig(allow_zero_length_lines=False),
+            ).convert()
+
+            self.assertTrue(result.status, msg=result.error)
+            root = ET.parse(result.generated_files).getroot()
+
+        self.assertEqual(len(self._nodes_tagged(root, 'amenity', 'bench')), 1)
+
+    def test_way_vertices_still_attach_to_node_features(self):
+        """Refusing to merge points must not detach edges from their endpoints."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = OSW2OSM(
+                zip_file_path=TEST_VALID_OSW_ZIP_FILE,
+                workdir=tmpdir,
+                prefix='connectivity',
+            ).convert()
+
+            self.assertTrue(result.status, msg=result.error)
+            root = ET.parse(result.generated_files).getroot()
+
+        ways_by_node = {}
+        for way in root.findall('.//way'):
+            for nd in way.findall('nd'):
+                ways_by_node.setdefault(nd.get('ref'), set()).add(way.get('id'))
+
+        junctions = [ref for ref, ways in ways_by_node.items() if len(ways) > 1]
+        self.assertTrue(junctions, 'Ways no longer share any node')
+
+        kerb_ids = {node.get('id') for node in self._nodes_tagged(root, 'barrier', 'kerb')}
+        self.assertTrue(kerb_ids)
+        self.assertTrue(
+            kerb_ids.issubset(set(ways_by_node)),
+            'Kerb nodes were orphaned from the ways they belong to',
+        )
 
 
 if __name__ == '__main__':
