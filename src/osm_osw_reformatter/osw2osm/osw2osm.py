@@ -3,6 +3,7 @@ import ogr2osm
 from xml.etree import ElementTree as ET
 from pathlib import Path
 from ..config import FormatterConfig
+from ..helpers.input_validation import InputValidationError, validate_osw_input
 from ..helpers.osw import OSWHelper
 from ..helpers.output_validation import (
     ConversionOutputError,
@@ -10,7 +11,6 @@ from ..helpers.output_validation import (
     ensure_osm_xml_has_entities,
 )
 from ..helpers.response import Response
-from ..helpers.warnings import WarningCollector, input_file_has_excess_coordinate_precision
 from ..serializer.osm.osm_normalizer import OSMNormalizer
 
 
@@ -24,27 +24,20 @@ class OSW2OSM:
         self.config = config or FormatterConfig()
 
     def convert(self) -> Response:
-        warnings = WarningCollector(self.config.coordinate_precision)
         try:
+            if self.config.validate_input:
+                validate_osw_input(self.zip_path, config=self.config)
             unzipped_files = OSWHelper.unzip(self.zip_path, self.workdir)
-            for file_path in unzipped_files.values():
-                if input_file_has_excess_coordinate_precision(
-                    file_path,
-                    self.config.coordinate_precision,
-                ):
-                    warnings.add_coordinate_precision()
-                    break
             input_file = OSWHelper.merge(
                 osm_files=unzipped_files,
                 output=self.workdir,
                 prefix=self.prefix,
                 config=self.config,
-                warnings=warnings,
             )
             output_file = Path(self.workdir, f'{self.prefix}.graph.osm.xml')
 
             # Create the translation object.
-            translation_object = OSMNormalizer()
+            translation_object = OSMNormalizer(config=self.config)
 
             # Create the ogr datasource
             datasource = ogr2osm.OgrDatasource(translation_object)
@@ -57,6 +50,7 @@ class OSW2OSM:
             # Instantiate either ogr2osm.OsmDataWriter or ogr2osm.PbfDataWriter
             data_writer = ogr2osm.OsmDataWriter(output_file, suppress_empty_tags=True)
             osm_data.output(data_writer)
+            self._restore_zero_length_way_refs(output_file)
             self._ensure_version_attribute(output_file)
             self._remap_ids_to_sequential(output_file)
             ensure_generated_files(str(output_file), require_existing=True)
@@ -71,17 +65,47 @@ class OSW2OSM:
             resp = Response(
                 status=True,
                 generated_files=str(output_file),
-                warnings=warnings.to_string(),
             )
+        except InputValidationError as error:
+            print(f'Invalid OSW input: {error}')
+            resp = Response(status=False, error=str(error))
         except ConversionOutputError as error:
             print(f'Error during conversion: {error}')
-            resp = Response(status=False, error=str(error), warnings=warnings.to_string())
+            resp = Response(status=False, error=str(error))
         except Exception as error:
             print(f'Error during conversion: {error}')
-            resp = Response(status=False, error=str(error), warnings=warnings.to_string())
+            resp = Response(status=False, error=str(error))
         finally:
             gc.collect()
         return resp
+
+    @staticmethod
+    def _restore_zero_length_way_refs(osm_xml_path: Path) -> None:
+        """Re-add the node reference ogr2osm drops from a zero-length way.
+
+        A zero-length OSW edge has both endpoints at the same node, so ogr2osm's
+        linestring parser skips the second vertex as a consecutive duplicate and
+        emits a way with one node, which is not valid OSM. Such an edge is meant
+        to survive as ``w = [n, n]``. A single-node way has no other source, so
+        any that appears here is this case.
+        """
+        try:
+            tree = ET.parse(osm_xml_path)
+        except Exception:
+            return
+
+        root = tree.getroot()
+        restored = False
+        for way in root.findall('.//way'):
+            refs = way.findall('nd')
+            if len(refs) != 1:
+                continue
+            duplicate = ET.Element('nd', {'ref': refs[0].get('ref')})
+            way.insert(list(way).index(refs[0]) + 1, duplicate)
+            restored = True
+
+        if restored:
+            tree.write(osm_xml_path, encoding='utf-8', xml_declaration=True)
 
     @staticmethod
     def _ensure_version_attribute(osm_xml_path: Path) -> None:

@@ -9,7 +9,9 @@ class TestFormatterConfig(unittest.TestCase):
         config = FormatterConfig()
 
         self.assertEqual(config.coordinate_precision, 7)
-        self.assertFalse(config.allow_zero_length_lines)
+        self.assertTrue(config.allow_zero_length_lines)
+        self.assertTrue(config.validate_input)
+        self.assertTrue(config.validate_output)
 
     def test_formatter_accepts_direct_config_overrides(self):
         with TemporaryDirectory() as tmpdir:
@@ -17,11 +19,15 @@ class TestFormatterConfig(unittest.TestCase):
                 workdir=tmpdir,
                 file_path="test.osm",
                 coordinate_precision=6,
-                allow_zero_length_lines=True,
+                allow_zero_length_lines=False,
+                validate_input=False,
+                validate_output=False,
             )
 
         self.assertEqual(formatter.config.coordinate_precision, 6)
-        self.assertTrue(formatter.config.allow_zero_length_lines)
+        self.assertFalse(formatter.config.allow_zero_length_lines)
+        self.assertFalse(formatter.config.validate_input)
+        self.assertFalse(formatter.config.validate_output)
 
     def test_coordinate_precision_must_be_integer(self):
         with self.assertRaises(TypeError):
@@ -34,6 +40,14 @@ class TestFormatterConfig(unittest.TestCase):
     def test_allow_zero_length_lines_must_be_boolean(self):
         with self.assertRaises(TypeError):
             FormatterConfig(allow_zero_length_lines="yes")
+
+    def test_validate_input_must_be_boolean(self):
+        with self.assertRaises(TypeError):
+            FormatterConfig(validate_input="yes")
+
+    def test_validate_output_must_be_boolean(self):
+        with self.assertRaises(TypeError):
+            FormatterConfig(validate_output="yes")
 
 
 if __name__ == "__main__":

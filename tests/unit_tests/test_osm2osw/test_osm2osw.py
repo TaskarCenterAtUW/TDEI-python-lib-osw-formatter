@@ -2,8 +2,10 @@ import os
 import re
 import json
 import asyncio
+import tempfile
 import unittest
 import math
+from src.osm_osw_reformatter.config import FormatterConfig
 from src.osm_osw_reformatter.osm2osw.osm2osw import OSM2OSW
 from src.osm_osw_reformatter.serializer.osw.osw_normalizer import OSW_SCHEMA_ID
 
@@ -16,6 +18,7 @@ TEST_INVALID_NODE_TAGS_FILE = os.path.join(ROOT_DIR, 'test_files/node_with_inval
 TEST_TREE_FILE = os.path.join(ROOT_DIR, 'test_files/tree-test.xml')
 TEST_BUG_3477_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3477.xml')
 TEST_BUG_3286_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3286.xml')
+TEST_NONSTANDARD_TAGS_FILE = os.path.join(ROOT_DIR, 'test_files/input_validation/nonstandard_tags.xml')
 
 
 def is_valid_float(value):
@@ -355,7 +358,13 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
         osm_file_path = TEST_BUG_3286_FILE
 
         async def run_test():
-            osm2osw = OSM2OSW(osm_file=osm_file_path, workdir=OUTPUT_DIR, prefix='test')
+            # Dropping the collapsed segment is the opt-out behavior.
+            osm2osw = OSM2OSW(
+                osm_file=osm_file_path,
+                workdir=OUTPUT_DIR,
+                prefix='test',
+                config=FormatterConfig(allow_zero_length_lines=False),
+            )
             result = await osm2osw.convert()
             self.assertTrue(result.status)
             self.assertEqual(len(result.generated_files), 2)
@@ -368,6 +377,49 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
 
             for file_path in result.generated_files:
                 os.remove(file_path)
+
+        asyncio.run(run_test())
+
+    def test_non_standard_tags_are_written_under_ext(self):
+        """Unknown keys, and invalid values on known keys, move under ext:*."""
+        expected = {
+            'nodes': {'ext:check_date': '2024-05-01'},
+            'points': {'ext:backrest': 'yes'},
+            'edges': {'ext:lit': 'yes', 'ext:incline': 'steep'},
+            'lines': {'ext:material': 'wood'},
+            'zones': {'ext:smoothness': 'good'},
+            'polygons': {'ext:roof:shape': 'flat'},
+        }
+
+        async def run_test():
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = await OSM2OSW(
+                    osm_file=TEST_NONSTANDARD_TAGS_FILE,
+                    workdir=tmpdir,
+                    prefix='ext',
+                ).convert()
+                self.assertTrue(result.status, msg=result.error)
+
+                properties = {}
+                for file_path in result.generated_files:
+                    dataset = os.path.basename(file_path).split('.')[-2]
+                    with open(file_path) as f:
+                        properties[dataset] = [
+                            feature['properties'] for feature in json.load(f)['features']
+                        ]
+
+            self.assertEqual(set(expected), set(properties))
+            for dataset, ext_tags in expected.items():
+                merged = {k: v for props in properties[dataset] for k, v in props.items()}
+                for key, value in ext_tags.items():
+                    self.assertEqual(merged.get(key), value, msg=f'{dataset}.{key}')
+                    # The bare key must not survive alongside its ext: form.
+                    self.assertNotIn(key[len('ext:'):], merged, msg=f'{dataset}.{key}')
+
+            # Schema tags stay bare: tactile_paving is a real OSW kerb field.
+            node_tags = {k: v for props in properties['nodes'] for k, v in props.items()}
+            self.assertEqual(node_tags.get('tactile_paving'), 'yes')
+            self.assertNotIn('ext:tactile_paving', node_tags)
 
         asyncio.run(run_test())
 

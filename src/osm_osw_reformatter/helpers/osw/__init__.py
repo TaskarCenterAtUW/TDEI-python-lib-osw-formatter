@@ -94,7 +94,7 @@ class OSWHelper:
         return counter.count
 
     @staticmethod
-    async def get_osm_graph(osm_file_path: str, config: FormatterConfig = None, warnings=None):
+    async def get_osm_graph(osm_file_path: str, config: FormatterConfig = None):
         loop = asyncio.get_event_loop()
         OG = await loop.run_in_executor(
             None,
@@ -107,7 +107,6 @@ class OSWHelper:
                 OSWHelper.osw_zone_filter,
                 OSWHelper.osw_polygon_filter,
                 config=config,
-                warnings=warnings,
             )
         )
 
@@ -134,7 +133,7 @@ class OSWHelper:
             return file_locations
 
     @staticmethod
-    def merge(osm_files: object, output: str, prefix: str, config: FormatterConfig = None, warnings=None):
+    def merge(osm_files: object, output: str, prefix: str, config: FormatterConfig = None):
         config = config or FormatterConfig()
         fc = {'type': 'FeatureCollection', 'features': []}
         for file, location in osm_files.items():
@@ -150,7 +149,6 @@ class OSWHelper:
                                 config.allow_zero_length_lines
                                 and file in {"edges", "lines"}
                             ),
-                            warnings=warnings,
                         )
                         if cleaned_feature is None:
                             feature_id = feature.get("properties", {}).get("_id", index)
@@ -176,11 +174,11 @@ class OSWHelper:
         await loop.run_in_executor(None, og.simplify)
 
     @classmethod
-    async def construct_geometries(cls, og, config: FormatterConfig = None, warnings=None):
+    async def construct_geometries(cls, og, config: FormatterConfig = None):
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
-            lambda: og.construct_geometries(config=config, warnings=warnings),
+            lambda: og.construct_geometries(config=config),
         )
 
     @classmethod

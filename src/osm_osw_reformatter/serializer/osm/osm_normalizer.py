@@ -2,6 +2,9 @@ import json
 import math
 import ogr2osm
 
+from ...config import FormatterConfig
+
+
 class OSMNormalizer(ogr2osm.TranslationBase):
 
     OSM_IMPLIED_FOOTWAYS = (
@@ -49,6 +52,42 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         'tactile_paving',
         'width',
     }
+
+    WAY_NODE_ATTRIBUTES = ('nds', 'refs', 'nodeRefs', 'nodes')
+
+    def __init__(self, config: FormatterConfig = None):
+        super().__init__()
+        self.config = config or FormatterConfig()
+        # OSW `_id` -> the OsmNode created for that node feature, and each way
+        # -> the `_u_id`/`_v_id` of the edge it came from. ogr2osm builds ways
+        # from geometry alone, so co-located nodes are indistinguishable to it;
+        # these let the endpoints be restored from the OSW references instead.
+        self._nodes_by_osw_id = {}
+        self._way_endpoints = {}
+
+    def merge_tags(self, geometry_type, tags_existing_geometry, tags_new_geometry):
+        """Decide whether two geometries at the same location become one.
+
+        ogr2osm keys nodes by their coordinates and merges anything that lands
+        on the same key. Returning ``None`` is its documented way to say the two
+        cannot be merged, which keeps both in the output. When
+        ``allow_zero_length_lines`` is set, two OSW features at the same location
+        stay two OSM nodes even with identical tags; otherwise they are merged.
+
+        Only feature-to-feature collisions are refused. ogr2osm routes way
+        vertices through the same call with empty tags, and merging those is what
+        attaches an edge to the node feature at its endpoint -- refuse them and
+        every way gets private vertices, leaving the network disconnected and
+        kerb nodes orphaned.
+        """
+        if (
+            geometry_type == 'node'
+            and self.config.allow_zero_length_lines
+            and tags_existing_geometry
+            and tags_new_geometry
+        ):
+            return None
+        return super().merge_tags(geometry_type, tags_existing_geometry, tags_new_geometry)
 
     def _stash_ext(self, tags, key, value):
         """Preserve non-compliant values under an ext: namespace."""
@@ -147,12 +186,83 @@ class OSMNormalizer(ogr2osm.TranslationBase):
 
         return tags
 
+    @staticmethod
+    def _ogr_field(ogrfeature, name):
+        """Read a field from the source feature, or None when it is absent."""
+        try:
+            index = ogrfeature.GetFieldIndex(name)
+        except Exception:
+            return None
+        if index is None or index < 0:
+            return None
+        try:
+            if not ogrfeature.IsFieldSet(index):
+                return None
+            value = ogrfeature.GetFieldAsString(index)
+        except Exception:
+            return None
+        return value or None
+
+    def _way_nodes_attribute(self, way):
+        for attribute in self.WAY_NODE_ATTRIBUTES:
+            if hasattr(way, attribute):
+                return attribute
+        return None
+
+    def _record_osw_references(self, osmgeometry, ogrfeature):
+        """Remember how OSW identified this geometry, before ogr2osm renumbers."""
+        if ogrfeature is None or osmgeometry is None:
+            return
+
+        if self._way_nodes_attribute(osmgeometry) is not None:
+            u_id = self._ogr_field(ogrfeature, '_u_id')
+            v_id = self._ogr_field(ogrfeature, '_v_id')
+            if u_id and v_id:
+                self._way_endpoints[id(osmgeometry)] = (u_id, v_id)
+            return
+
+        osw_id = self._ogr_field(ogrfeature, '_id')
+        if osw_id:
+            self._nodes_by_osw_id.setdefault(osw_id, osmgeometry)
+
+    def _repair_way_endpoints(self, osmways):
+        """Point each way at the nodes its OSW edge actually referenced.
+
+        Two OSW nodes may share a location, and ogr2osm resolves a way vertex by
+        coordinate, so both endpoints of a zero-length edge land on whichever
+        node it created first. The `_u_id`/`_v_id` references say which nodes
+        were meant.
+        """
+        if not self._way_endpoints or not self._nodes_by_osw_id:
+            return
+
+        for way in osmways:
+            endpoints = self._way_endpoints.get(id(way))
+            if not endpoints:
+                continue
+            start = self._nodes_by_osw_id.get(endpoints[0])
+            end = self._nodes_by_osw_id.get(endpoints[1])
+            if start is None or end is None:
+                continue
+
+            attribute = self._way_nodes_attribute(way)
+            if attribute is None:
+                continue
+            nodes = list(getattr(way, attribute) or [])
+            if len(nodes) >= 2:
+                nodes[0] = start
+                nodes[-1] = end
+            else:
+                nodes = [start, end]
+            setattr(way, attribute, nodes)
+
     def process_feature_post(self, osmgeometry, ogrfeature, ogrgeometry):
         '''
         This method is called after the creation of an OsmGeometry object. The
         ogr feature and ogr geometry used to create the object are passed as
         well. Note that any return values will be discarded by ogr2osm.
         '''
+        self._record_osw_references(osmgeometry, ogrfeature)
         def _set_tag(osm_obj, key, value):
             tags = getattr(osm_obj, "tags", None)
             if tags is None:
@@ -236,6 +346,8 @@ class OSMNormalizer(ogr2osm.TranslationBase):
         Adds a '_id' tag with the new derived positive ID and rewrites
         references accordingly.
         """
+        self._repair_way_endpoints(osmways)
+
         # Capture original IDs for mapping
         node_identity_map = {}
         node_id_map = {}

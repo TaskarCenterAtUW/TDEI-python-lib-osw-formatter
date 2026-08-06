@@ -4,6 +4,7 @@ import zipfile
 import unittest
 from python_osw_validation import OSWValidation
 
+from src.osm_osw_reformatter.config import FormatterConfig
 from src.osm_osw_reformatter.osw2osm.osw2osm import OSW2OSM
 from src.osm_osw_reformatter import Formatter
 
@@ -12,10 +13,19 @@ OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(ROOT_DIR)), 'output')
 TEST_DATA_WITH_INCLINE_ZIP_FILE = os.path.join(ROOT_DIR, 'test_files/dataset_with_incline.zip')
 TEST_ZONE_BOUNDARY_FILE = os.path.join(ROOT_DIR, 'test_files/zone_boundary.xml')
 
+# The incline dataset predates the current OSW schema, so input validation is
+# switched off; these tests assert on the compliance of the *output*.
+NO_INPUT_VALIDATION = FormatterConfig(validate_input=False)
+
 
 class TestOSMCompliance(unittest.IsolatedAsyncioTestCase):
     async def test_output_is_osm_compliant(self):
-        osw2osm = OSW2OSM(zip_file_path=TEST_DATA_WITH_INCLINE_ZIP_FILE, workdir=OUTPUT_DIR, prefix='compliance')
+        osw2osm = OSW2OSM(
+            zip_file_path=TEST_DATA_WITH_INCLINE_ZIP_FILE,
+            workdir=OUTPUT_DIR,
+            prefix='compliance',
+            config=NO_INPUT_VALIDATION
+        )
         result = osw2osm.convert()
         osm_file = result.generated_files
 
@@ -61,7 +71,8 @@ class TestOSMCompliance(unittest.IsolatedAsyncioTestCase):
         osw2osm = OSW2OSM(
             zip_file_path=TEST_DATA_WITH_INCLINE_ZIP_FILE,
             workdir=OUTPUT_DIR,
-            prefix='incline'
+            prefix='incline',
+            config=NO_INPUT_VALIDATION
         )
         result = osw2osm.convert()
         osm_file = result.generated_files
