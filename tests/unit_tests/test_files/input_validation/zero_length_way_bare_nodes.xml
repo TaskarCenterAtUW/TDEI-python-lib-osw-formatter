@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The OSM side of fixtures/zero_length_edge_bare_nodes: two untagged nodes at the
+  exact same location, joined by a way. Nothing distinguishes the nodes but their
+  identity, so both must survive and the way must keep running between them.
+-->
+<osm version="0.6" generator="tdei-fixture">
+  <node id="1" lat="47.6555000" lon="-122.3105000" version="1"/>
+  <node id="2" lat="47.6555000" lon="-122.3105000" version="1"/>
+  <way id="1" version="1">
+    <nd ref="1"/>
+    <nd ref="2"/>
+    <tag k="highway" v="footway"/>
+    <tag k="footway" v="sidewalk"/>
+    <tag k="foot" v="yes"/>
+    <tag k="surface" v="concrete"/>
+  </way>
+</osm>

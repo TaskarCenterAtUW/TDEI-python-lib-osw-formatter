@@ -1,0 +1,4 @@
+<osm version="0.6" generator="tdei-fixture">
+  <node id="1" lat="47.6555000" lon="-122.3105000" version="1"/>
+  <node id="2" lat="47.65550001" lon="-122.30950002" version="1" "ext:tag": NaN/>
+</osm>

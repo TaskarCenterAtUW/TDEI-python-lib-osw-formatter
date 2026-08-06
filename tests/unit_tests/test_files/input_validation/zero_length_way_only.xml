@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The zero-length scenario on its own, from the OSM side: one node, and one way
+  whose two node references are both that node. It is the counterpart of
+  fixtures/zero_length_edge_only, and converts to a single node plus a single
+  edge that starts and ends at it when allow_zero_length_lines is set.
+-->
+<osm version="0.6" generator="tdei-fixture">
+  <node id="1" lat="47.6555000" lon="-122.3105000" version="1"/>
+  <way id="1" version="1">
+    <nd ref="1"/>
+    <nd ref="1"/>
+    <tag k="highway" v="footway"/>
+    <tag k="footway" v="sidewalk"/>
+    <tag k="foot" v="yes"/>
+    <tag k="surface" v="concrete"/>
+  </way>
+</osm>

@@ -32,7 +32,8 @@ setup(
         'networkx~=3.2',
         'shapely~=2.0.2',
         'pyproj~=3.6.1',
-        'ogr2osm==1.2.0'
+        'ogr2osm==1.2.0',
+        'python-osw-validation==0.5.0'
     ],
     packages=find_packages(where='src'),
     classifiers=[

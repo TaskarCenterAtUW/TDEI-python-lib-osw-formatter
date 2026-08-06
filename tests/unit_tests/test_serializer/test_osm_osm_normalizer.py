@@ -2,20 +2,7 @@ import math
 import unittest
 import json
 
-import importlib.util
-import sys
-import types
-from pathlib import Path
-
-# Stub ogr2osm before loading the module under test
-sys.modules['ogr2osm'] = types.SimpleNamespace(TranslationBase=object)
-
-module_path = Path(__file__).resolve().parents[3] / 'src/osm_osw_reformatter/serializer/osm/osm_normalizer.py'
-spec = importlib.util.spec_from_file_location('osm_normalizer', module_path)
-osn = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(osn)
-
-OSMNormalizer = osn.OSMNormalizer
+from src.osm_osw_reformatter.serializer.osm.osm_normalizer import OSMNormalizer
 
 
 class DummyOsmGeometry:

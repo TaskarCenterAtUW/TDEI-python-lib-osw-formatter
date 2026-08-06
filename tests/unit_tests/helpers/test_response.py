@@ -9,7 +9,6 @@ class TestResponseClass(unittest.TestCase):
         self.assertTrue(response.status)
         self.assertIsNone(response.generated_files)
         self.assertIsNone(response.error)
-        self.assertEqual(response.warnings, "")
 
     def test_custom_values(self):
         files = ['file1.txt', 'file2.txt']
@@ -17,12 +16,10 @@ class TestResponseClass(unittest.TestCase):
             status=False,
             generated_files=files,
             error='An error message',
-            warnings='A warning message',
         )
         self.assertFalse(response.status)
         self.assertEqual(response.generated_files, files)
         self.assertEqual(response.error, 'An error message')
-        self.assertEqual(response.warnings, 'A warning message')
 
     def test_generated_files_string(self):
         response = Response(status=True, generated_files='file.txt')
