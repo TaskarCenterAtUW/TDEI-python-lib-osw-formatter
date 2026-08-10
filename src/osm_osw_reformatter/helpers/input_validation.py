@@ -22,6 +22,15 @@ OSM_COORDINATE_PRECISION_ERROR_TEMPLATE = (
     "{coordinate_precision}-digits precision that TDEI doesn't allow. "
     "Please clean your dataset and resubmit"
 )
+# Every offending node is collected so the message can name what to fix, but
+# only this many are spelled out before the rest are summarised as a count.
+OSM_PRECISION_OFFENDERS_SHOWN = 20
+OSM_COORDINATE_PRECISION_NODE_TEMPLATE = (
+    "node {id} at lat={lat}, lon={lon} has {decimals} decimal places"
+)
+OSM_COORDINATE_PRECISION_MORE_TEMPLATE = (
+    "...and {count} more node(s) with the same problem"
+)
 OSM_CORRUPT_FILE_ERROR = (
     "invalid input file, the OSM file is corrupted and could not be read. "
     "Please fix the file and resubmit"
@@ -90,15 +99,48 @@ class OSWFileUnreadableError(InputValidationError):
 
 
 class OSMCoordinatePrecisionError(ValueError):
-    """Raised when an OSM input file carries coordinates that are too precise."""
+    """Raised when an OSM input file carries coordinates that are too precise.
 
-    def __init__(self, coordinate_precision: int):
+    Every offending node is kept on `offenders`, each a dict of `id`, `lat`,
+    `lon`, and `decimals`. The message names them so the file can be corrected
+    without hunting for which node is at fault.
+    """
+
+    def __init__(self, coordinate_precision: int, offenders: Optional[Iterable[Any]] = None):
         self.coordinate_precision = coordinate_precision
-        super().__init__(
-            OSM_COORDINATE_PRECISION_ERROR_TEMPLATE.format(
-                coordinate_precision=coordinate_precision,
-            )
+        self.offenders: List[Dict[str, Any]] = list(offenders or [])
+        self.messages: List[str] = format_precision_offenders(self.offenders)
+        self.issues: List[Dict[str, Any]] = [
+            {
+                'filename': None,
+                'feature_index': None,
+                'error_message': [message],
+            }
+            for message in self.messages
+        ]
+        summary = OSM_COORDINATE_PRECISION_ERROR_TEMPLATE.format(
+            coordinate_precision=coordinate_precision,
         )
+        details = '\n'.join(f'- {line}' for line in self.messages)
+        super().__init__(f'{summary}\n{details}' if details else summary)
+
+
+def format_precision_offenders(offenders: Optional[Iterable[Any]]) -> List[str]:
+    """Render offending nodes as readable lines, capped with a remainder."""
+    offenders = list(offenders or [])
+    lines = [
+        OSM_COORDINATE_PRECISION_NODE_TEMPLATE.format(
+            id=offender.get('id'),
+            lat=offender.get('lat'),
+            lon=offender.get('lon'),
+            decimals=offender.get('decimals'),
+        )
+        for offender in offenders[:OSM_PRECISION_OFFENDERS_SHOWN]
+    ]
+    remainder = len(offenders) - len(lines)
+    if remainder > 0:
+        lines.append(OSM_COORDINATE_PRECISION_MORE_TEMPLATE.format(count=remainder))
+    return lines
 
 
 class OSMFileCorruptError(ValueError):
@@ -124,7 +166,7 @@ class OSMFileCorruptError(ValueError):
 
 
 class _PbfPrecisionHandler(osmium.SimpleHandler):
-    """Flag PBF nodes whose coordinates carry more decimals than allowed.
+    """Collect PBF nodes whose coordinates carry more decimals than allowed.
 
     osmium exposes coordinates as integers in units of 1e-7 degrees, so a
     coordinate fits `precision` decimals exactly when that integer divides by
@@ -133,14 +175,26 @@ class _PbfPrecisionHandler(osmium.SimpleHandler):
 
     def __init__(self, coordinate_precision: int):
         osmium.SimpleHandler.__init__(self)
+        self.coordinate_precision = coordinate_precision
         self.divisor = 10 ** (OSMIUM_LOCATION_PRECISION - coordinate_precision)
-        self.exceeds_precision = False
+        self.offenders: List[Dict[str, Any]] = []
+
+    @property
+    def exceeds_precision(self) -> bool:
+        return bool(self.offenders)
 
     def node(self, n) -> None:
-        if self.exceeds_precision or not n.location.valid():
+        if not n.location.valid():
             return
         if n.location.x % self.divisor or n.location.y % self.divisor:
-            self.exceeds_precision = True
+            latitude = format(n.location.lat, 'f').rstrip('0')
+            longitude = format(n.location.lon, 'f').rstrip('0')
+            self.offenders.append({
+                'id': n.id,
+                'lat': latitude,
+                'lon': longitude,
+                'decimals': max(_decimal_places(latitude), _decimal_places(longitude)),
+            })
 
 
 def is_osm_parse_failure(message: str) -> bool:
@@ -156,40 +210,62 @@ def _decimal_places(value: str) -> int:
     return max(0, -exponent) if isinstance(exponent, int) else 0
 
 
-def osm_xml_exceeds_coordinate_precision(file_path: str, coordinate_precision: int) -> bool:
+def osm_xml_precision_offenders(file_path: str, coordinate_precision: int) -> List[Dict[str, Any]]:
+    """Every XML node whose coordinates carry more decimals than allowed."""
+    offenders: List[Dict[str, Any]] = []
     try:
         for _event, element in ET.iterparse(file_path, events=('end',)):
             if element.tag != 'node':
                 element.clear()
                 continue
-            for attribute in ('lat', 'lon'):
-                value = element.get(attribute)
-                if value is not None and _decimal_places(value) > coordinate_precision:
-                    return True
+            latitude = element.get('lat')
+            longitude = element.get('lon')
+            decimals = max(_decimal_places(latitude), _decimal_places(longitude))
+            if decimals > coordinate_precision:
+                offenders.append({
+                    'id': element.get('id'),
+                    'lat': latitude,
+                    'lon': longitude,
+                    'decimals': decimals,
+                })
             element.clear()
     except ET.ParseError as error:
         raise OSMFileCorruptError(str(error)) from error
-    return False
+    return offenders
 
 
-def osm_pbf_exceeds_coordinate_precision(file_path: str, coordinate_precision: int) -> bool:
+def osm_pbf_precision_offenders(file_path: str, coordinate_precision: int) -> List[Dict[str, Any]]:
+    """Every PBF node whose coordinates carry more decimals than allowed."""
     # Nothing osmium reads can exceed its own 1e-7 resolution, so at or above
     # that precision the scan can only ever pass.
     if coordinate_precision >= OSMIUM_LOCATION_PRECISION:
-        return False
+        return []
     handler = _PbfPrecisionHandler(coordinate_precision)
     try:
         handler.apply_file(file_path)
     except RuntimeError as error:
         raise OSMFileCorruptError(str(error)) from error
-    return handler.exceeds_precision
+    return handler.offenders
+
+
+def osm_precision_offenders(file_path: str, coordinate_precision: int) -> List[Dict[str, Any]]:
+    """Every node coordinate carrying more decimals than allowed."""
+    if Path(file_path).suffix.lower() == '.pbf':
+        return osm_pbf_precision_offenders(file_path, coordinate_precision)
+    return osm_xml_precision_offenders(file_path, coordinate_precision)
+
+
+def osm_xml_exceeds_coordinate_precision(file_path: str, coordinate_precision: int) -> bool:
+    return bool(osm_xml_precision_offenders(file_path, coordinate_precision))
+
+
+def osm_pbf_exceeds_coordinate_precision(file_path: str, coordinate_precision: int) -> bool:
+    return bool(osm_pbf_precision_offenders(file_path, coordinate_precision))
 
 
 def osm_exceeds_coordinate_precision(file_path: str, coordinate_precision: int) -> bool:
     """Return whether any node coordinate carries more decimals than allowed."""
-    if Path(file_path).suffix.lower() == '.pbf':
-        return osm_pbf_exceeds_coordinate_precision(file_path, coordinate_precision)
-    return osm_xml_exceeds_coordinate_precision(file_path, coordinate_precision)
+    return bool(osm_precision_offenders(file_path, coordinate_precision))
 
 
 def validate_osm_input(file_path: str, config: Optional[FormatterConfig] = None) -> None:
@@ -204,8 +280,9 @@ def validate_osm_input(file_path: str, config: Optional[FormatterConfig] = None)
         OSMCoordinatePrecisionError: If any node coordinate is too precise.
     """
     config = config or FormatterConfig()
-    if osm_exceeds_coordinate_precision(str(file_path), config.coordinate_precision):
-        raise OSMCoordinatePrecisionError(config.coordinate_precision)
+    offenders = osm_precision_offenders(str(file_path), config.coordinate_precision)
+    if offenders:
+        raise OSMCoordinatePrecisionError(config.coordinate_precision, offenders)
 
 
 def _issue_messages(issue: Any) -> List[str]:
@@ -257,6 +334,7 @@ def validation_config(config: Optional[FormatterConfig] = None) -> ValidationCon
     return ValidationConfig(
         coordinate_precision=config.coordinate_precision,
         allow_zero_length_lines=config.allow_zero_length_lines,
+        max_geometry_vertices=config.max_geometry_vertices,
     )
 
 

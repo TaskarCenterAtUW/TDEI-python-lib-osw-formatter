@@ -44,7 +44,13 @@ class OSW2OSM:
             datasource.open_datasource(input_file)
 
             # Instantiate the ogr to osm converter class ogr2osm. OsmData and start the conversion process
-            osm_data = ogr2osm.OsmData(translation_object)
+            # ogr2osm splits any way longer than this, sharing a node between
+            # the pieces so the run stays joined. Its own default is 1800; the
+            # formatter's limit governs instead.
+            osm_data = ogr2osm.OsmData(
+                translation_object,
+                max_points_in_way=self.config.max_geometry_vertices,
+            )
             osm_data.process(datasource)
 
             # Instantiate either ogr2osm.OsmDataWriter or ogr2osm.PbfDataWriter

@@ -6,7 +6,7 @@ import argparse
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 OUTPUT_DIR = f'{ROOT_DIR}/output'
-OSM_INPUT_FILE = f'{ROOT_DIR}/fixtures/zero_length_way_only.xml'
+OSM_INPUT_FILE = f'{ROOT_DIR}/fixtures/corrupt_osm.xml'
 OSW_INPUT_FILE = f'{ROOT_DIR}/fixtures/invalid_osw.zip'
 
 is_exists = os.path.exists(OUTPUT_DIR)
@@ -20,7 +20,8 @@ config = FormatterConfig(
 
 async def osm_convert():
     f = Formatter(workdir=OUTPUT_DIR, file_path=OSM_INPUT_FILE)
-    await f.osm2osw()
+    r = await f.osm2osw()
+    print(r.error)
     # Uncomment below line to clean up the generated files
     # f.cleanup()
 
