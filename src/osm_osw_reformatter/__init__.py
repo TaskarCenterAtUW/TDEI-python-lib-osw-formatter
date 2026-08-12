@@ -5,6 +5,7 @@ from .osw2osm.osw2osm import OSW2OSM
 from .config import (
     DEFAULT_ALLOW_ZERO_LENGTH_LINES,
     DEFAULT_COORDINATE_PRECISION,
+    DEFAULT_MAX_GEOMETRY_VERTICES,
     DEFAULT_VALIDATE_INPUT,
     DEFAULT_VALIDATE_OUTPUT,
     FormatterConfig,
@@ -25,6 +26,7 @@ class Formatter:
         prefix='final',
         config: FormatterConfig = None,
         coordinate_precision: int = None,
+        max_geometry_vertices: int = None,
         allow_zero_length_lines: bool = None,
         validate_input: bool = None,
         validate_output: bool = None,
@@ -40,6 +42,11 @@ class Formatter:
                     DEFAULT_COORDINATE_PRECISION
                     if coordinate_precision is None
                     else coordinate_precision
+                ),
+                max_geometry_vertices=(
+                    DEFAULT_MAX_GEOMETRY_VERTICES
+                    if max_geometry_vertices is None
+                    else max_geometry_vertices
                 ),
                 allow_zero_length_lines=(
                     DEFAULT_ALLOW_ZERO_LENGTH_LINES

@@ -177,12 +177,57 @@ class TestValidateOSMInput(unittest.TestCase):
         with self.assertRaises(OSMCoordinatePrecisionError) as ctx:
             validate_osm_input(str(INVALID_OSM_XML))
 
+        message = str(ctx.exception)
+        self.assertIn(
+            "invalid input file, the file has GPS locations with higher than "
+            "7-digits precision that TDEI doesn't allow. "
+            "Please clean your dataset and resubmit",
+            message,
+        )
+
+    def test_message_names_every_offending_node(self):
+        """The file has to say what to fix, not just that something is wrong."""
+        with self.assertRaises(OSMCoordinatePrecisionError) as ctx:
+            validate_osm_input(str(INVALID_OSM_XML))
+
+        error = ctx.exception
         self.assertEqual(
-            str(ctx.exception),
+            [offender['id'] for offender in error.offenders], ['2', '6', '12']
+        )
+        self.assertEqual(
+            error.messages,
+            [
+                'node 2 at lat=47.65550001, lon=-122.30950002 has 8 decimal places',
+                'node 6 at lat=47.654800012, lon=-122.3100000 has 9 decimal places',
+                'node 12 at lat=47.6549000, lon=-122.30980008 has 8 decimal places',
+            ],
+        )
+        for node_id in ('node 2', 'node 6', 'node 12'):
+            with self.subTest(node=node_id):
+                self.assertIn(node_id, str(error))
+
+    def test_offenders_beyond_the_cap_are_summarised(self):
+        offenders = [
+            {'id': str(index), 'lat': '47.12345678', 'lon': '-122.12345678', 'decimals': 8}
+            for index in range(25)
+        ]
+        error = OSMCoordinatePrecisionError(7, offenders)
+
+        self.assertEqual(len(error.offenders), 25)
+        # Every offender is kept, but the message stays readable.
+        self.assertEqual(len(error.messages), 21)
+        self.assertIn('...and 5 more node(s) with the same problem', error.messages[-1])
+
+    def test_precision_error_without_offenders_keeps_the_summary(self):
+        error = OSMCoordinatePrecisionError(7)
+
+        self.assertEqual(
+            str(error),
             "invalid input file, the file has GPS locations with higher than "
             "7-digits precision that TDEI doesn't allow. "
             "Please clean your dataset and resubmit",
         )
+        self.assertEqual(error.offenders, [])
 
     def test_message_reports_the_configured_precision(self):
         with self.assertRaises(OSMCoordinatePrecisionError) as ctx:
