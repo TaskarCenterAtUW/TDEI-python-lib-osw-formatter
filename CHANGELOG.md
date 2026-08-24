@@ -1,5 +1,10 @@
 # Change log
 
+### 0.4.2
+- Preserve closed custom OSM areas whose attributes do not already use the `ext:*` namespace. Unsupported ordinary tags now reach polygon normalization and are emitted as `ext:*` properties, while recognized linear features such as sidewalks, fences, and tree rows remain excluded from polygon output.
+- Fix `ext:osm_id` for polygons and pedestrian zones by retaining pyosmium's original OSM way or relation ID instead of its derived area ID, which doubled IDs for areas created from ways.
+- Add serializer and end-to-end regression coverage for ordinary-tagged custom polygons, linear-feature exclusion, multiple exteriors, and original OSM IDs on polygon and zone output.
+
 ### 0.4.1
 - Add formatter configuration for `max_geometry_vertices`, defaulting to 2000 to match the validator. The limit is applied to OSW input and to generated OSW, so a line or polygon feature carrying more vertices is reported with the validator's own message naming the dataset, feature and counts.
 - Drive `ogr2osm`'s way splitting from the same setting, raising the split point from its 1800 default. A run of coordinates too long for one OSM way becomes several ways sharing a node, so the pieces stay joined. This still applies to input the validator accepts: it counts unique vertices and ignores a ring's closing coordinate, while an OSM way counts every node reference, so a ring of exactly 2000 unique vertices is valid yet needs 2001 references.
