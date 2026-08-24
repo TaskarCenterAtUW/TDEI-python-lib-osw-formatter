@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="test" upload="false">
+  <node id="1" lat="39.9535598" lon="-75.1648278"/>
+  <node id="2" lat="39.9532212" lon="-75.1623680"/>
+  <node id="3" lat="39.9514786" lon="-75.1627745"/>
+  <node id="4" lat="39.9517956" lon="-75.1650713"/>
+  <way id="1">
+    <nd ref="1"/>
+    <nd ref="2"/>
+    <nd ref="3"/>
+    <nd ref="4"/>
+    <nd ref="1"/>
+    <tag k="name" v="Test"/>
+    <tag k="test" v="tester"/>
+  </way>
+</osm>

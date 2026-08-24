@@ -580,7 +580,12 @@ class OSWPolygonNormalizer:
 
     def is_custom(self):
         tag_dict = _feature_tags(self.tags)
-        return _has_only_ext_tags(tag_dict)
+        # Polygon parsing only calls this normalizer for closed OSM areas. Let
+        # unsupported source tags reach ``normalize()``, where they are safely
+        # namespaced as ``ext:*``. Requiring them to already use that namespace
+        # made the conversion order self-defeating: ordinary tags were rejected
+        # before normalization had a chance to preserve them.
+        return bool(tag_dict) and not self.is_building() and not self.is_wood()
 
 class OSWZoneNormalizer:
     def __init__(self, tags):

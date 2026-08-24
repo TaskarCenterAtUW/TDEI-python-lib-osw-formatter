@@ -275,6 +275,15 @@ class TestOSWPolygonNormalizer(unittest.TestCase):
         normalizer = OSWPolygonNormalizer(tags)
         self.assertTrue(normalizer.is_custom())
 
+    def test_ordinary_tags_are_a_custom_polygon_candidate(self):
+        normalizer = OSWPolygonNormalizer({'name': 'Test', 'test': 'tester'})
+
+        self.assertTrue(normalizer.is_custom())
+        self.assertEqual(
+            normalizer.normalize(),
+            {'ext:name': 'Test', 'ext:test': 'tester'},
+        )
+
     def test_normalize_wood(self):
         tags = {'natural': 'wood', 'leaf_cycle': 'mixed', 'leaf_type': 'broadleaved'}
         normalizer = OSWPolygonNormalizer(tags)
@@ -282,8 +291,8 @@ class TestOSWPolygonNormalizer(unittest.TestCase):
         expected = {'natural': 'wood', 'leaf_cycle': 'mixed', 'leaf_type': 'broadleaved'}
         self.assertEqual(result, expected)
 
-    def test_invalid_polygon_raises(self):
-        tags = {'natural': 'meadow'}
+    def test_untagged_polygon_raises(self):
+        tags = {}
         normalizer = OSWPolygonNormalizer(tags)
         with self.assertRaises(ValueError):
             normalizer.normalize()

@@ -260,12 +260,17 @@ class TestOSMGraph(unittest.TestCase):
             def outer_rings(self):
                 return self._outers
 
+            def orig_id(self):
+                return 2
+
             def inner_rings(self, exterior):
                 return []
 
         parser.area(DummyArea())
         self.assertIn("z5", G.nodes)
         self.assertIn("z51", G.nodes)
+        self.assertEqual(G.nodes["z5"]["osm_id"], 2)
+        self.assertEqual(G.nodes["z51"]["osm_id"], 2)
 
     def test_osm_polygon_parser_multiple_exteriors(self):
         G = nx.MultiDiGraph()
@@ -296,12 +301,17 @@ class TestOSMGraph(unittest.TestCase):
             def outer_rings(self):
                 return self._outers
 
+            def orig_id(self):
+                return 3
+
             def inner_rings(self, exterior):
                 return []
 
         parser.area(DummyArea())
         self.assertIn("g7", G.nodes)
         self.assertIn("g71", G.nodes)
+        self.assertEqual(G.nodes["g7"]["osm_id"], 3)
+        self.assertEqual(G.nodes["g71"]["osm_id"], 3)
 
     def test_simplify(self):
         self.mock_graph.add_node(1)
@@ -427,7 +437,8 @@ class TestOSMGraph(unittest.TestCase):
             mock_node = MagicMock(ref=1, lon=10, lat=20)
             area_mock = MagicMock(
                 tags=valid_tags,
-                id=1,
+                id=2,
+                orig_id=lambda: 1,
                 outer_rings=lambda: [[mock_node]],
                 inner_rings=lambda _: [],
             )
@@ -443,6 +454,7 @@ class TestOSMGraph(unittest.TestCase):
             self.assertEqual(len(added_nodes), 2)
             self.assertEqual(added_nodes[0][1]["lon"], 10)
             self.assertEqual(added_nodes[0][1]["lat"], 20)
+            self.assertEqual(self.mock_graph.nodes["z2"]["osm_id"], 1)
 
     def test_polygon_parser(self):
         mock_progressbar = MagicMock()
@@ -593,6 +605,51 @@ class TestOSMGraph(unittest.TestCase):
         )
 
         self.assertIn("g301846", self.mock_graph.nodes)
+
+    def test_polygon_parser_normalizes_ordinary_tags_as_custom(self):
+        parser = OSMPolygonParser(self.mock_graph, OSWPolygonNormalizer.osw_polygon_filter)
+        outer_ring = [[
+            MagicMock(lon=0.0, lat=0.0),
+            MagicMock(lon=1.0, lat=0.0),
+            MagicMock(lon=1.0, lat=1.0),
+            MagicMock(lon=0.0, lat=0.0),
+        ]]
+
+        parser.area(
+            MagicMock(
+                tags={"name": "Test", "test": "tester"},
+                id=2,
+                orig_id=lambda: 1,
+                outer_rings=lambda: outer_ring,
+                inner_rings=lambda _: [],
+            )
+        )
+
+        self.assertEqual(
+            self.mock_graph.nodes["g2"],
+            {
+                "osm_id": 1,
+                "ext:name": "Test",
+                "ext:test": "tester",
+                "ndref": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 0.0]],
+                "indref": [],
+            },
+        )
+
+    def test_polygon_parser_does_not_duplicate_closed_sidewalk_as_polygon(self):
+        parser = OSMPolygonParser(self.mock_graph, OSWPolygonNormalizer.osw_polygon_filter)
+
+        parser.area(
+            MagicMock(
+                tags={"highway": "footway", "footway": "sidewalk", "name": "Loop"},
+                id=4,
+                orig_id=lambda: 2,
+                outer_rings=lambda: [],
+                inner_rings=lambda _: [],
+            )
+        )
+
+        self.assertNotIn("g4", self.mock_graph.nodes)
 
     def test_to_geojson_empty_graph(self):
         # Paths for test files

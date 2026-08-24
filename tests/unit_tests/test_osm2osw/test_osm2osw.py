@@ -18,6 +18,10 @@ TEST_INVALID_NODE_TAGS_FILE = os.path.join(ROOT_DIR, 'test_files/node_with_inval
 TEST_TREE_FILE = os.path.join(ROOT_DIR, 'test_files/tree-test.xml')
 TEST_BUG_3477_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3477.xml')
 TEST_BUG_3286_FILE = os.path.join(ROOT_DIR, 'test_files/bug_3286.xml')
+TEST_CUSTOM_POLYGON_ORDINARY_TAGS_FILE = os.path.join(
+    ROOT_DIR,
+    'test_files/custom_polygon_ordinary_tags.xml',
+)
 TEST_NONSTANDARD_TAGS_FILE = os.path.join(ROOT_DIR, 'test_files/input_validation/nonstandard_tags.xml')
 
 
@@ -348,6 +352,35 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
             feature = geojson["features"][0]
             self.assertEqual(feature["geometry"]["type"], "Polygon")
             self.assertEqual(feature["properties"].get("ext:demolished:building"), "yes")
+
+            for file_path in result.generated_files:
+                os.remove(file_path)
+
+        asyncio.run(run_test())
+
+    def test_closed_way_with_ordinary_tags_emits_custom_polygon(self):
+        async def run_test():
+            osm2osw = OSM2OSW(
+                osm_file=TEST_CUSTOM_POLYGON_ORDINARY_TAGS_FILE,
+                workdir=OUTPUT_DIR,
+                prefix='custom-polygon',
+            )
+            result = await osm2osw.convert()
+
+            self.assertTrue(result.status)
+            self.assertEqual(len(result.generated_files), 1)
+            polygon_file = result.generated_files[0]
+            self.assertTrue(polygon_file.endswith('.graph.polygons.geojson'))
+
+            with open(polygon_file) as f:
+                geojson = json.load(f)
+
+            self.assertEqual(len(geojson['features']), 1)
+            feature = geojson['features'][0]
+            self.assertEqual(feature['geometry']['type'], 'Polygon')
+            self.assertEqual(feature['properties']['ext:name'], 'Test')
+            self.assertEqual(feature['properties']['ext:test'], 'tester')
+            self.assertEqual(feature['properties']['ext:osm_id'], '1')
 
             for file_path in result.generated_files:
                 os.remove(file_path)
