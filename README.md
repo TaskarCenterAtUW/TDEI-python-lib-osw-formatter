@@ -81,7 +81,7 @@ To install the GDAL library (Geospatial Data Abstraction Library) on your system
    3. Convert those files into xml file at provided output directory path   
 
 ## Custom attributes (OSW 0.3)
-- Custom features that contain only `ext:*` attributes are preserved and written to their matching GeoJSON:
+- Custom features are preserved and written to their matching GeoJSON. Existing `ext:*` attributes retain their names; unsupported ordinary OSM attributes on custom polygons are namespaced as `ext:*` during normalization:
   - Point geometries → `points.geojson` with numeric `_id` (no `p` prefix) and `ext:osm_id`.
   - LineString geometries → `lines.geojson` with `_id`, `_u_id`, `_v_id`, plus `ext:*`.
   - Polygon geometries → `polygons.geojson` with `_id` and `ext:*`.

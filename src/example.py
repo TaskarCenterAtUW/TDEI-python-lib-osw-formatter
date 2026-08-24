@@ -6,7 +6,7 @@ import argparse
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 OUTPUT_DIR = f'{ROOT_DIR}/output'
-OSM_INPUT_FILE = f'{ROOT_DIR}/fixtures/corrupt_osm.xml'
+OSM_INPUT_FILE = f'{ROOT_DIR}/fixtures/3988.xml'
 OSW_INPUT_FILE = f'{ROOT_DIR}/fixtures/invalid_osw.zip'
 
 is_exists = os.path.exists(OUTPUT_DIR)

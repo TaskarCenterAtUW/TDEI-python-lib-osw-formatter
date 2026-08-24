@@ -255,7 +255,10 @@ class OSMZoneParser(osmium.SimpleHandler):
         if not self.zone_filter(a.tags):
             return
         
-        d = {}
+        # ``Area.id`` is an internal pyosmium identifier (2 * way ID for
+        # way-derived areas), not the source OSM identifier. Keep the original
+        # ID explicitly so it becomes the correct ``ext:osm_id`` on output.
+        d = {'osm_id': int(a.orig_id())}
         tags = dict(a.tags)
 
         d2 = {**d, **OSWZoneNormalizer(tags).normalize()}
@@ -322,13 +325,18 @@ class OSMPolygonParser(osmium.SimpleHandler):
         if not self.polygon_filter(tags):
             return
 
-        d = {}
+        # ``Area.id`` is an internal pyosmium identifier (2 * way ID for
+        # way-derived areas), not the source OSM identifier. Keep the original
+        # ID explicitly so it becomes the correct ``ext:osm_id`` on output.
+        d = {'osm_id': int(a.orig_id())}
         normalizer = OSWPolygonNormalizer(tags)
+        way_normalizer = OSWWayNormalizer(tags)
         line_normalizer = OSWLineNormalizer(tags)
         zone_normalizer = OSWZoneNormalizer(tags)
 
         if normalizer.is_custom() and (
-            line_normalizer.is_fence()
+            way_normalizer.filter()
+            or line_normalizer.is_fence()
             or line_normalizer.is_tree_row()
             or zone_normalizer.is_pedestrian()
         ):
