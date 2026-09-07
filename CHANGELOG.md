@@ -1,5 +1,9 @@
 # Change log
 
+### 0.4.3
+- Re-release the BUG-3726 collision-safe OSW→OSM node remapping fix so generated ways retain references to their exact `ogr2osm` node objects instead of snapping to unrelated nodes with overlapping temporary numeric IDs.
+- Re-verify the regression against the San Diego dataset that produced QGIS spider-line artifacts: the 0.3.5 output contains 247 segments longer than 500 metres, while 0.4.3 produces none and preserves the source maximum segment length.
+
 ### 0.4.2
 - Preserve closed custom OSM areas whose attributes do not already use the `ext:*` namespace. Unsupported ordinary tags now reach polygon normalization and are emitted as `ext:*` properties, while recognized linear features such as sidewalks, fences, and tree rows remain excluded from polygon output.
 - Fix `ext:osm_id` for polygons and pedestrian zones by retaining pyosmium's original OSM way or relation ID instead of its derived area ID, which doubled IDs for areas created from ways.
