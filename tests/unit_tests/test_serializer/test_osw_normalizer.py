@@ -1,6 +1,9 @@
 import unittest
 import importlib.util
 import math
+import copy
+import jsonschema_rs
+from unittest.mock import mock_open, patch
 from pathlib import Path
 
 module_path = Path(__file__).resolve().parents[3] / 'src/osm_osw_reformatter/serializer/osw/osw_normalizer.py'
@@ -342,12 +345,15 @@ class TestCommonFunctions(unittest.TestCase):
         self.assertIsNone(incline('steep', {}))
 
     def test_leaf_cycle(self):
-        self.assertEqual(leaf_cycle('Semi_deciduous', {}), 'semi_deciduous')
-        self.assertIsNone(leaf_cycle('unknown', {}))
+        tags = {'natural': 'tree'}
+        self.assertEqual(leaf_cycle('Deciduous', tags), 'deciduous')
+        self.assertIsNone(leaf_cycle('Semi_deciduous', tags))
+        self.assertIsNone(leaf_cycle('unknown', tags))
 
     def test_leaf_type(self):
-        self.assertEqual(leaf_type('BroadLeaved', {}), 'broadleaved')
-        self.assertIsNone(leaf_type('fake', {}))
+        tags = {'natural': 'tree'}
+        self.assertEqual(leaf_type('BroadLeaved', tags), 'broadleaved')
+        self.assertIsNone(leaf_type('fake', tags))
 
     def test_kerb(self):
         self.assertEqual(osw_normalizer.kerb('flush', {}), 'flush')
@@ -432,6 +438,179 @@ class TestNormalizeWidthField(unittest.TestCase):
         result = _normalize(tags, keep_keys, {})
         self.assertEqual(result.get("ext:foo_copy"), "bar")
 
+
+
+class TestSchemaEnums(unittest.TestCase):
+    def setUp(self):
+        self.clear_caches()
+
+    def tearDown(self):
+        self.clear_caches()
+
+    @staticmethod
+    def clear_caches():
+        osw_normalizer._schema_enum_values.cache_clear()
+        osw_normalizer._property_enum_values.cache_clear()
+        osw_normalizer._dataset_property_schema.cache_clear()
+
+    def test_all_enum_values_produce_schema_valid_properties(self):
+        cases = (
+            ('edges', 'surface', {'highway': 'residential'}, OSWWayNormalizer),
+            ('edges', 'foot', {'highway': 'residential'}, OSWWayNormalizer),
+            ('edges', 'climb', {'highway': 'steps'}, OSWWayNormalizer),
+            ('edges', 'crossing:markings', {'highway': 'footway', 'footway': 'crossing'}, OSWWayNormalizer),
+            ('edges', 'service', {'highway': 'service'}, OSWWayNormalizer),
+            ('edges', 'footway', {'highway': 'footway'}, OSWWayNormalizer),
+            ('edges', 'highway', {}, OSWWayNormalizer),
+            ('nodes', 'kerb', {'barrier': 'kerb'}, OSWNodeNormalizer),
+            ('nodes', 'tactile_paving', {'barrier': 'kerb'}, OSWNodeNormalizer),
+            ('polygons', 'building', {}, OSWPolygonNormalizer),
+            ('zones', 'surface', {'highway': 'pedestrian'}, OSWZoneNormalizer),
+        )
+        for dataset, field, base_tags, normalizer in cases:
+            schema = osw_normalizer._dataset_property_schema(dataset)
+            validator = jsonschema_rs.Draft7Validator(schema)
+            for value in schema['properties'][field]['enum']:
+                with self.subTest(dataset=dataset, field=field, value=value):
+                    result = normalizer({**base_tags, field: value}).normalize()
+                    self.assertEqual(result[field], value)
+                    properties = {'_id': '1', **result}
+                    if dataset == 'edges':
+                        properties.update(_u_id='2', _v_id='3')
+                    elif dataset == 'zones':
+                        properties['_w_id'] = ['2', '3', '4']
+                    validator.validate(properties)
+
+    def test_schema_changes_drive_helpers_and_feature_detection(self):
+        schemas = {dataset: copy.deepcopy(osw_normalizer._dataset_property_schema(dataset))
+                   for dataset in ('edges', 'nodes', 'polygons', 'zones')}
+        changes = (
+            ('edges', 'surface', 'asphalt', surface),
+            ('edges', 'foot', 'yes', osw_normalizer.foot),
+            ('edges', 'climb', 'up', climb),
+            ('edges', 'crossing:markings', 'dashes', crossing_markings),
+            ('nodes', 'kerb', 'flush', osw_normalizer.kerb),
+            ('nodes', 'tactile_paving', 'yes', tactile_paving),
+        )
+        for dataset, field, removed, helper in changes:
+            values = schemas[dataset]['properties'][field]['enum']
+            values.remove(removed)
+            values.append('schema_added')
+        for dataset, field in (('edges', 'highway'), ('polygons', 'building')):
+            schemas[dataset]['properties'][field]['enum'].append('schema_added')
+
+        with patch.object(osw_normalizer, '_dataset_property_schema', side_effect=schemas.__getitem__):
+            for dataset, field, removed, helper in changes:
+                with self.subTest(field=field):
+                    self.assertEqual(helper('schema_added', {field: 'schema_added'}), 'schema_added')
+                    self.assertIsNone(helper(removed, {field: removed}))
+            self.assertTrue(OSWWayNormalizer({'highway': 'schema_added'}).is_road())
+            self.assertEqual(OSWWayNormalizer({'highway': 'schema_added'}).normalize()['highway'], 'schema_added')
+            self.assertTrue(OSWPolygonNormalizer({'building': 'schema_added'}).is_building())
+            self.assertTrue(OSWNodeNormalizer({'kerb': 'schema_added'}).is_kerb())
+
+    def test_zone_surface_uses_zone_schema(self):
+        schema = copy.deepcopy(osw_normalizer._dataset_property_schema('zones'))
+        schema['properties']['surface']['enum'] = ['zone_only']
+        with patch.object(osw_normalizer, '_dataset_property_schema', return_value=schema):
+            result = OSWZoneNormalizer({'highway': 'pedestrian', 'surface': 'zone_only'}).normalize()
+            self.assertEqual(result['surface'], 'zone_only')
+            result = OSWZoneNormalizer({'highway': 'pedestrian', 'surface': 'asphalt'}).normalize()
+            self.assertNotIn('surface', result)
+            self.assertEqual(result['ext:surface'], 'asphalt')
+
+    def test_string_enum_fields_also_follow_schema(self):
+        result = osw_normalizer._normalize(
+            {'service': 'unsupported'}, {'service': str}, {}, dataset='edges',
+        )
+        self.assertEqual(result, {'ext:service': 'unsupported'})
+        with self.assertRaisesRegex(RuntimeError, 'Invalid OSW edges default'):
+            osw_normalizer._normalize({}, {}, {'foot': 'unsupported'}, dataset='edges')
+
+    def test_legacy_osm_mappings_still_work(self):
+        for highway in ('primary', 'secondary', 'tertiary', 'trunk'):
+            with self.subTest(highway=highway):
+                result = OSWWayNormalizer({'highway': highway + '_link'}).normalize()
+                self.assertEqual(result['highway'], highway)
+        for crossing, markings in (('marked', 'yes'), ('unmarked', 'no'), ('zebra', 'zebra')):
+            self.assertEqual(crossing_markings(crossing, {'crossing': crossing}), markings)
+
+
+class TestSchemaLeafEnums(unittest.TestCase):
+    def tearDown(self):
+        osw_normalizer._schema_enum_values.cache_clear()
+
+    def test_invalid_leaf_values_are_preserved_as_extensions(self):
+        for natural, normalizer in (
+            ('tree', OSWPointNormalizer),
+            ('tree_row', OSWLineNormalizer),
+            ('wood', OSWPolygonNormalizer),
+        ):
+            for value in ('semi_deciduous', 'semi_evergreen', 'unknown'):
+                with self.subTest(natural=natural, value=value):
+                    result = normalizer({
+                        'natural': natural, 'leaf_cycle': value, 'leaf_type': 'fake',
+                    }).normalize()
+                    self.assertNotIn('leaf_cycle', result)
+                    self.assertNotIn('leaf_type', result)
+                    self.assertEqual(result['ext:leaf_cycle'], value)
+                    self.assertEqual(result['ext:leaf_type'], 'fake')
+
+    def test_mixed_depends_on_feature_schema(self):
+        for natural, normalizer in (
+            ('tree', OSWPointNormalizer),
+            ('tree_row', OSWLineNormalizer),
+            ('wood', OSWPolygonNormalizer),
+        ):
+            with self.subTest(natural=natural):
+                result = normalizer({
+                    'natural': natural, 'leaf_cycle': 'Mixed', 'leaf_type': 'Mixed',
+                }).normalize()
+                for property_name in ('leaf_cycle', 'leaf_type'):
+                    if natural == 'tree':
+                        self.assertNotIn(property_name, result)
+                        self.assertEqual(result['ext:' + property_name], 'Mixed')
+                    else:
+                        self.assertEqual(result[property_name], 'mixed')
+                        self.assertNotIn('ext:' + property_name, result)
+
+    def test_building_leaf_tags_are_extensions(self):
+        result = OSWPolygonNormalizer({
+            'building': 'yes', 'leaf_cycle': 'deciduous', 'leaf_type': 'broadleaved',
+        }).normalize()
+        self.assertNotIn('leaf_cycle', result)
+        self.assertNotIn('leaf_type', result)
+        self.assertEqual(result['ext:leaf_cycle'], 'deciduous')
+        self.assertEqual(result['ext:leaf_type'], 'broadleaved')
+
+    def test_enum_changes_come_from_schema(self):
+        schema = copy.deepcopy(osw_normalizer._dataset_property_schema('points'))
+        schema['properties']['leaf_cycle']['enum'].append('new_schema_value')
+        tree = next(branch for branch in schema['anyOf']
+                    if branch.get('properties', {}).get('natural', {}).get('enum') == ['tree'])
+        tree['properties']['leaf_cycle']['enum'] = ['new_schema_value']
+        osw_normalizer._schema_enum_values.cache_clear()
+        with patch.object(osw_normalizer, '_dataset_property_schema', return_value=schema):
+            self.assertEqual(leaf_cycle('new_schema_value', {'natural': 'tree'}), 'new_schema_value')
+            self.assertIsNone(leaf_cycle('deciduous', {'natural': 'tree'}))
+
+    def test_missing_schema_branch_fails_explicitly(self):
+        osw_normalizer._schema_enum_values.cache_clear()
+        with patch.object(osw_normalizer, '_dataset_property_schema', return_value={'anyOf': []}):
+            with self.assertRaisesRegex(RuntimeError, 'Expected one OSW points schema branch'):
+                leaf_cycle('deciduous', {'natural': 'tree'})
+
+    def test_malformed_schema_is_not_treated_as_an_invalid_tag(self):
+        osw_normalizer._dataset_property_schema.cache_clear()
+        osw_normalizer._schema_enum_values.cache_clear()
+        try:
+            with patch('builtins.open', mock_open(read_data='{broken json')):
+                with self.assertRaisesRegex(RuntimeError, 'Cannot load OSW points property schema'):
+                    OSWPointNormalizer({
+                        'natural': 'tree', 'leaf_cycle': 'deciduous',
+                    }).normalize()
+        finally:
+            osw_normalizer._dataset_property_schema.cache_clear()
 
 
 if __name__ == '__main__':

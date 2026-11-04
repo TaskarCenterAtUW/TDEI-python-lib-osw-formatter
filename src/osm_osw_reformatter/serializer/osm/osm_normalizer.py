@@ -3,6 +3,7 @@ import math
 import ogr2osm
 
 from ...config import FormatterConfig
+from ..osw.osw_normalizer import _property_enum_values
 
 
 class OSMNormalizer(ogr2osm.TranslationBase):
@@ -167,7 +168,7 @@ class OSMNormalizer(ogr2osm.TranslationBase):
 
         # OSW fields with similar OSM field names
         if 'climb' in tags:
-            if tags.get('highway') != 'steps' or tags['climb'] not in ('up', 'down'):
+            if tags.get('highway') != 'steps' or tags['climb'] not in _property_enum_values('edges', 'climb'):
                 self._stash_ext(tags, 'climb', tags.get('climb'))
                 tags.pop('climb', '')
 
