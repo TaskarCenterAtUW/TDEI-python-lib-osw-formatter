@@ -1,22 +1,83 @@
 import types
 import math
+import json
+from functools import lru_cache
+
+from python_osw_validation import DEFAULT_DATASET_SCHEMAS
 
 OSW_SCHEMA_ID = "https://sidewalks.washington.edu/opensidewalks/0.3/schema.json"
 
-LEAF_CYCLE_VALUES = (
-    "deciduous",
-    "evergreen",
-    "mixed",
-    "semi_deciduous",
-    "semi_evergreen",
-)
 
-LEAF_TYPE_VALUES = (
-    "broadleaved",
-    "leafless",
-    "mixed",
-    "needleleaved",
-)
+@lru_cache(maxsize=None)
+def _schema_enum_values(dataset, discriminator, feature_type, property_name):
+    """Read an enum from the same bundled dataset schema used for validation.
+
+    Feature-specific anyOf branches can restrict the top-level property enum
+    (for example, mixed leaf types are allowed for woods but not single trees).
+    Schema loading/structure failures must surface rather than falling back to
+    an independently maintained list of allowed values.
+    """
+    schema = _dataset_property_schema(dataset)
+    matches = [
+        branch for branch in schema["anyOf"]
+        if discriminator in branch.get("required", [])
+        and feature_type in branch.get("properties", {}).get(
+            discriminator, {}).get("enum", [])
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"Expected one OSW {dataset} schema branch for "
+            f"{discriminator}={feature_type}; found {len(matches)}."
+        )
+    definition = matches[0]["properties"].get(property_name)
+    if definition is None or "enum" not in definition:
+        raise RuntimeError(
+            f"Missing OSW enum for {dataset}/{feature_type}/{property_name}."
+        )
+    values = frozenset(definition["enum"])
+    parent_enum = schema.get("properties", {}).get(property_name, {}).get("enum")
+    if parent_enum is not None:
+        values &= frozenset(parent_enum)
+    return values
+
+
+@lru_cache(maxsize=None)
+def _dataset_property_schema(dataset):
+    try:
+        with open(DEFAULT_DATASET_SCHEMAS[dataset], encoding="utf-8") as schema_file:
+            schema = json.load(schema_file)
+        properties = schema["properties"]["features"]["items"]["properties"]["properties"]
+        if not isinstance(properties.get("anyOf"), list):
+            raise ValueError("Missing feature-specific anyOf branches")
+        return properties
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        # _normalize treats ValueError/KeyError as bad input tags. A broken
+        # schema is a conversion failure, so it must not take that path.
+        raise RuntimeError(f"Cannot load OSW {dataset} property schema: {error}") from error
+
+
+@lru_cache(maxsize=None)
+def _property_enum_values(dataset, property_name):
+    definition = _dataset_property_schema(dataset).get("properties", {}).get(property_name, {})
+    if "enum" not in definition:
+        raise RuntimeError(f"Missing OSW enum for {dataset}/{property_name}.")
+    return frozenset(definition["enum"])
+
+
+def _enum_value(dataset, property_name, value):
+    value = value.lower()
+    return value if value in _property_enum_values(dataset, property_name) else None
+
+
+def _leaf_value(property_name, tag_value, tags):
+    # Route by feature type, not by a shared union of incompatible enums.
+    natural = _tag_value(tags, "natural")
+    dataset = {"tree": "points", "tree_row": "lines", "wood": "polygons"}.get(natural)
+    if dataset is None:
+        return None
+    value = tag_value.lower()
+    allowed = _schema_enum_values(dataset, "natural", natural, property_name)
+    return value if value in allowed else None
 
 
 def _tag_value(tags, key):
@@ -67,25 +128,6 @@ def _has_only_ext_tags(tags):
 
 
 class OSWWayNormalizer:
-
-    ROAD_HIGHWAY_VALUES = (
-        "primary",
-        "secondary",
-        "tertiary",
-        "residential",
-        "service",
-        "unclassified",
-        "trunk", # Not traversible, just for conflation
-        "primary_link",
-        "secondary_link",
-        "tertiary_link",
-        "trunk_link"
-    )
-
-    CLIMB_VALUES = (
-        "up",
-        "down",
-    )
 
     def __init__(self, tags):
         self.tags = tags
@@ -148,7 +190,7 @@ class OSWWayNormalizer:
         }
         generic_defaults = {}
         
-        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
+        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults}, dataset="edges")
         return new_tags
     
     def _normalize_pedestrian(self, keep_keys = {}, defaults = {}):
@@ -208,7 +250,7 @@ class OSWWayNormalizer:
         return new_tags
     
     def _normalize_road(self, keep_keys = {}, defaults = {}):
-        generic_keep_keys = {"highway": (lambda tag_value, tags: tag_value.partition("_")[0]), "maxspeed": ["ext:maxspeed", str]}
+        generic_keep_keys = {"highway": (lambda tag_value, tags: tag_value.removesuffix("_link")), "maxspeed": ["ext:maxspeed", str]}
         generic_defaults = {}
         
         new_tags = self._normalize_way({**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
@@ -257,11 +299,15 @@ class OSWWayNormalizer:
         )
     
     def is_road(self):
-        return _tag_value(self.tags, "highway") in self.ROAD_HIGHWAY_VALUES
+        # Link suffix removal is an OSM-to-OSW mapping, not an OSW enum.
+        highway = _tag_value(self.tags, "highway").removesuffix("_link")
+        pedestrian = OSWWayNormalizer({"highway": highway})
+        return highway in _property_enum_values("edges", "highway") and not (
+            pedestrian.is_footway() or pedestrian.is_stairs()
+            or pedestrian.is_pedestrian() or pedestrian.is_living_street()
+        )
 
 class OSWNodeNormalizer:
-    KERB_VALUES = ("flush", "lowered", "rolled", "raised")
-
     def __init__(self, tags):
         self.tags = tags
 
@@ -282,7 +328,7 @@ class OSWNodeNormalizer:
         generic_keep_keys = {}
         generic_defaults = {}
         
-        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
+        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults}, dataset="nodes")
         return new_tags
     
     def _normalize_kerb(self, keep_keys = {}, defaults = {}):
@@ -296,7 +342,7 @@ class OSWNodeNormalizer:
         kerb_value = _tag_value(self.tags, "kerb")
         barrier_value = _tag_value(self.tags, "barrier")
         has_kerb_key = "kerb" in self.tags
-        return (kerb_value in self.KERB_VALUES) or (
+        return (kerb_value in _property_enum_values("nodes", "kerb")) or (
             barrier_value == "kerb" and (not has_kerb_key or kerb_value == "yes")
         )
     
@@ -350,7 +396,7 @@ class OSWPointNormalizer:
         generic_keep_keys = {}
         generic_defaults = {}
         
-        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
+        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults}, dataset="points")
         return new_tags
     
     def is_powerpole(self):
@@ -412,7 +458,7 @@ class OSWLineNormalizer:
         generic_keep_keys = {}
         generic_defaults = {}
         
-        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
+        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults}, dataset="lines")
         return new_tags
     
     def is_fence(self):
@@ -426,109 +472,6 @@ class OSWLineNormalizer:
         return _has_only_ext_tags(tag_dict)
     
 class OSWPolygonNormalizer:
-    # Will be fetched from schema soon
-    BUILDING_VALUES = (
-        "allotment_house",
-        "apartments",
-        "bakehouse",
-        "barn",
-        "barracks",
-        "beach_hut",
-        "boathouse",
-        "bridge",
-        "bungalow",
-        "bunker",
-        "cabin",
-        "carport",
-        "castle",
-        "cathedral",
-        "chapel",
-        "church",
-        "civic",
-        "college",
-        "commercial",
-        "conservatory",
-        "construction",
-        "container",
-        "cowshed",
-        "detached",
-        "digester",
-        "dormitory",
-        "farm",
-        "farm_auxiliary",
-        "fire_station",
-        "garage",
-        "garages",
-        "gatehouse",
-        "ger",
-        "government",
-        "grandstand",
-        "greenhouse",
-        "guardhouse",
-        "hangar",
-        "hospital",
-        "hotel",
-        "house",
-        "houseboat",
-        "hut",
-        "industrial",
-        "kindergarten",
-        "kingdom_hall",
-        "kiosk",
-        "livestock",
-        "military",
-        "monastery",
-        "mosque",
-        "museum",
-        "office",
-        "outbuilding",
-        "pagoda",
-        "parking",
-        "pavilion",
-        "presbytery",
-        "public",
-        "quonset_hut",
-        "religious",
-        "residential",
-        "retail",
-        "riding_hall",
-        "roof",
-        "ruins",
-        "school",
-        "semidetached_house",
-        "service",
-        "shed",
-        "shrine",
-        "silo",
-        "slurry_tank",
-        "sports_centre",
-        "sports_hall",
-        "stable",
-        "stadium",
-        "static_caravan",
-        "stilt_house",
-        "storage_tank",
-        "sty",
-        "supermarket",
-        "synagogue",
-        "tech_cab",
-        "temple",
-        "tent",
-        "terrace",
-        "toilets",
-        "tower",
-        "train_station",
-        "transformer_tower",
-        "transportation",
-        "tree_house",
-        "trullo",
-        "university",
-        "warehouse",
-        "water_tower",
-        "windmill",
-        "yes"
-    )
-
     def __init__(self, tags):
         self.tags = tags
 
@@ -545,9 +488,7 @@ class OSWPolygonNormalizer:
                 {
                     "building": str,
                     "name": str,
-                    "opening_hours": str,
-                    "leaf_cycle": leaf_cycle,
-                    "leaf_type": leaf_type
+                    "opening_hours": str
                 }
             )
         elif self.is_wood():
@@ -569,11 +510,11 @@ class OSWPolygonNormalizer:
         generic_keep_keys = {}
         generic_defaults = {}
         
-        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
+        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults}, dataset="polygons")
         return new_tags
     
     def is_building(self):
-        return self.tags.get("building", "") in self.BUILDING_VALUES
+        return self.tags.get("building", "") in _property_enum_values("polygons", "building")
     
     def is_wood(self):
         return _tag_value(self.tags, "natural") == "wood"
@@ -600,7 +541,7 @@ class OSWZoneNormalizer:
 
     def normalize(self):
         if self.is_pedestrian():
-            return self._normalize_zone({"highway": str, "surface": surface, "name": str, "description": str})
+            return self._normalize_zone({"highway": str, "surface": (lambda value, tags: _enum_value("zones", "surface", value)), "name": str, "description": str})
         else:
             raise ValueError("This is an invalid zone")
     
@@ -608,7 +549,7 @@ class OSWZoneNormalizer:
         generic_keep_keys = {}
         generic_defaults = {"foot": "yes"}
         
-        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults})
+        new_tags = _normalize(self.tags, {**generic_keep_keys, **keep_keys}, {**generic_defaults, **defaults}, dataset="zones")
         return new_tags
     
     def is_pedestrian(self):
@@ -621,7 +562,7 @@ def check_nan_and_raise(tag_type, temp):
     return temp
 
     
-def _normalize(tags, keep_keys, defaults):
+def _normalize(tags, keep_keys, defaults, dataset=None):
     new_tags = {}
     consumed_tags = set()
     invalid_tags = set()
@@ -677,6 +618,20 @@ def _normalize(tags, keep_keys, defaults):
     # Preserve order of keep_keys first followed by defaults
     new_tags.update(defaults)
 
+    # Also check enum fields copied as strings or supplied by a conversion
+    # default. Invalid source values follow the existing extension-tag path.
+    if dataset is not None:
+        definitions = _dataset_property_schema(dataset).get("properties", {})
+        for key, value in list(new_tags.items()):
+            if "enum" in definitions.get(key, {}) and value not in _property_enum_values(dataset, key):
+                if key in defaults:
+                    raise RuntimeError(f"Invalid OSW {dataset} default: {key}={value!r}.")
+                del new_tags[key]
+                for source_key, rule in keep_keys.items():
+                    destination = rule[0] if isinstance(rule, list) else source_key
+                    if destination == key and source_key in tags:
+                        invalid_tags.add(source_key)
+
     # Preserve non-compliant or unknown source tags under ext:*.
     ext_tags = {}
     for key, value in _feature_tags(tags).items():
@@ -689,99 +644,47 @@ def _normalize(tags, keep_keys, defaults):
 
     
 def leaf_cycle(tag_value, tags):
-    if tag_value.lower() not in LEAF_CYCLE_VALUES:
-        return None
-    return tag_value.lower()
+    return _leaf_value("leaf_cycle", tag_value, tags)
 
 
 def leaf_type(tag_value, tags):
-    if tag_value.lower() not in LEAF_TYPE_VALUES:
-        return None
-    return tag_value.lower()
+    return _leaf_value("leaf_type", tag_value, tags)
 
 
 def natural_point(tag_value, tags):
-    if tag_value.lower() != "tree":
-        return None
-    return "tree"
+    return _enum_value("points", "natural", tag_value)
 
 
 def natural_line(tag_value, tags):
-    if tag_value.lower() != "tree_row":
-        return None
-    return "tree_row"
+    return _enum_value("lines", "natural", tag_value)
 
 
 def natural_polygon(tag_value, tags):
-    if tag_value.lower() != "wood":
-        return None
-    return "wood"
+    return _enum_value("polygons", "natural", tag_value)
 
 
 def tactile_paving(tag_value, tags):
-    if tag_value.lower() not in (
-                                "yes", 
-                                "contrasted", 
-                                "no",
-                                "primitive",
-                                ):
-        return None
-    else:
-        return tag_value.lower()
+    return _enum_value("nodes", "tactile_paving", tag_value)
+
 
 def surface(tag_value, tags):
-    if tag_value.lower() not in (
-                                "asphalt", 
-                                "concrete", 
-                                "gravel", 
-                                "grass", 
-                                "paved", 
-                                "paving_stones", 
-                                "unpaved", 
-                                "dirt", 
-                                "grass_paver"
-                                ):
-        return None
-    else:
-        return tag_value.lower()
-    
+    return _enum_value("edges", "surface", tag_value)
+
+
 def crossing_markings(tag_value, tags):
-    if tags.get("crossing:markings", "").lower() in (                        
-                                "dashes",
-                                "dots",
-                                "ladder",
-                                "ladder:paired",
-                                "lines",
-                                "lines:paired",
-                                "no",
-                                "skewed",
-                                "surface",
-                                "yes",
-                                "zebra",
-                                "zebra:bicolour",
-                                "zebra:double",
-                                "zebra:paired",
-                                "rainbow",
-                                "lines:rainbow",
-                                "zebra:rainbow",
-                                "ladder:skewed",
-                                "pictograms"
-                                ):
-        return tags["crossing:markings"].lower()
-    elif tags.get("crossing", "").lower() == "marked":
-        return "yes"
-    elif tags.get("crossing", "").lower() == "zebra":
-        return "zebra"
-    elif tags.get("crossing", "").lower() == "unmarked":
-        return "no"
-    else:
-        return None
-    
+    value = _enum_value("edges", "crossing:markings", tags.get("crossing:markings", ""))
+    if value is not None:
+        return value
+    # These are translations of legacy OSM tags, not schema enum definitions.
+    value = {"marked": "yes", "zebra": "zebra", "unmarked": "no"}.get(
+        tags.get("crossing", "").lower()
+    )
+    return _enum_value("edges", "crossing:markings", value) if value is not None else None
+
+
 def climb(tag_value, tags):
-    if tag_value.lower() not in OSWWayNormalizer.CLIMB_VALUES:
-        return None
-    else:
-        return tag_value.lower()
+    return _enum_value("edges", "climb", tag_value)
+
 
 def incline(tag_value, tags):
     try:
@@ -790,21 +693,8 @@ def incline(tag_value, tags):
         return None
     
 def foot(tag_value, tags):
-    if tag_value.lower() not in (
-                                "yes", 
-                                "no", 
-                                "designated", 
-                                "permissive", 
-                                "use_sidepath", 
-                                "private", 
-                                "destination"
-                                ):
-        return None
-    else:
-        return tag_value.lower()
-    
+    return _enum_value("edges", "foot", tag_value)
+
+
 def kerb(tag_value, tags):
-    if tag_value.lower() not in OSWNodeNormalizer.KERB_VALUES:
-        return None
-    else:
-        return tag_value.lower()
+    return _enum_value("nodes", "kerb", tag_value)

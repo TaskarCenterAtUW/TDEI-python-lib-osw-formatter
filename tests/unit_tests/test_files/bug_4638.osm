@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="bug-4638-synthetic-repro">
+  <node id="1" version="1" lat="47.6555000" lon="-122.3105000" />
+  <node id="2" version="1" lat="47.6555000" lon="-122.3100000" />
+  <node id="79823" version="1" lat="47.6556000" lon="-122.3102500">
+    <tag k="natural" v="tree" />
+    <tag k="leaf_cycle" v="semi_deciduous" />
+    <tag k="leaf_type" v="broadleaved" />
+  </node>
+  <way id="100" version="1">
+    <nd ref="1" />
+    <nd ref="2" />
+    <tag k="highway" v="footway" />
+    <tag k="footway" v="sidewalk" />
+  </way>
+</osm>

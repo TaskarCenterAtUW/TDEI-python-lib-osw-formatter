@@ -292,6 +292,26 @@ class TestOSM2OSW(unittest.IsolatedAsyncioTestCase):
 
         asyncio.run(run_test())
 
+    async def test_bug_4638_output_validates_and_preserves_unsupported_leaf_cycle(self):
+        # Default output validation must pass, rather than rejecting converter output.
+        with tempfile.TemporaryDirectory() as workdir:
+            result = await OSM2OSW(
+                osm_file=os.path.join(ROOT_DIR, 'test_files/bug_4638.osm'),
+                workdir=workdir,
+                prefix='bug4638',
+            ).convert()
+            self.assertTrue(result.status, result.error)
+            points_file = next(path for path in result.generated_files
+                               if path.endswith('.points.geojson'))
+            with open(points_file) as file:
+                points = json.load(file)['features']
+            self.assertEqual(len(points), 1)
+            properties = points[0]['properties']
+            self.assertEqual(properties['natural'], 'tree')
+            self.assertEqual(properties['leaf_type'], 'broadleaved')
+            self.assertEqual(properties['ext:leaf_cycle'], 'semi_deciduous')
+            self.assertNotIn('leaf_cycle', properties)
+
     def test_retains_incline_tag(self):
         osm_file_path = TEST_INCLINE_FILE
 

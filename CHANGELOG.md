@@ -1,5 +1,11 @@
 # Change log
 
+### 0.4.4
+- Fix BUG-4638 by reading OSW enum values from the local dataset schemas bundled with `python-osw-validation`, replacing hardcoded lists for leaf attributes, buildings, highways, kerbs, surfaces, tactile paving, crossing markings, foot access and climb direction. Cache schema lookups without downloading schemas during conversion.
+- Apply feature-specific leaf constraints: `mixed` remains valid for tree rows and woods but is preserved under `ext:*` for individual trees. Preserve other unsupported enum values under `ext:*` and retain existing OSM tag translations.
+- Check copied enum fields and conversion defaults against their dataset schemas, and use the validation schema for climb values in OSW-to-OSM conversion. Report schema-loading failures instead of silently using fallback values.
+- Add regression coverage for BUG-4638, schema-driven enum changes, schema-valid output, unsupported-value preservation and legacy OSM mappings. All 255 unit tests pass.
+
 ### 0.4.3
 - Re-release the BUG-3726 collision-safe OSW→OSM node remapping fix so generated ways retain references to their exact `ogr2osm` node objects instead of snapping to unrelated nodes with overlapping temporary numeric IDs.
 - Re-verify the regression against the San Diego dataset that produced QGIS spider-line artifacts: the 0.3.5 output contains 247 segments longer than 500 metres, while 0.4.3 produces none and preserves the source maximum segment length.
