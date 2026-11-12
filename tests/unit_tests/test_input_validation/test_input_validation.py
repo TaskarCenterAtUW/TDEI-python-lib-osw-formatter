@@ -440,9 +440,9 @@ class TestOSM2OSWOutputValidation(unittest.TestCase):
     @staticmethod
     def _break_edges(original):
         """Make the generated edges non-compliant after they are written."""
-        def wrapper(cls, workdir, filename, og):
+        def wrapper(cls, workdir, filename, og, config=None):
             async def _inner():
-                paths = await original.__func__(cls, workdir, filename, og)
+                paths = await original.__func__(cls, workdir, filename, og, config=config)
                 for path in paths:
                     if path.endswith('edges.geojson'):
                         with open(path) as f:

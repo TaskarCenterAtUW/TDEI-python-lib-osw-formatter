@@ -5,6 +5,7 @@ import osmium
 import networkx as nx
 from shapely.geometry import Point, mapping, shape
 from ...config import FormatterConfig
+from ..polygon_partition import partition_polygon
 from ..geometry_cleanup import (
     clean_linestring_geometry,
     clean_polygon_geometry,
@@ -767,7 +768,8 @@ class OSMGraph:
     def is_directed(self) -> bool:
         return self.G.is_directed()
 
-    def to_geojson(self, *args) -> None:
+    def to_geojson(self, *args, config: FormatterConfig = None) -> None:
+        config = config or FormatterConfig()
         OSW_JSON_HEADER = {"$schema": OSW_SCHEMA_ID, "type": "FeatureCollection"}
         nodes_path = args[0]
         edges_path = args[1]
@@ -877,12 +879,19 @@ class OSMGraph:
                     {"type": "Feature", "geometry": geometry, "properties": d_copy}
                 )
             elif geometry_type == "Polygon":
-                _assign_ids(d_copy, polygon_id_counter, source_id)
-                polygon_id_counter += 1
-
-                polygon_features.append(
-                    {"type": "Feature", "geometry": geometry, "properties": d_copy}
-                )
+                try:
+                    parts = partition_polygon(
+                        geometry_obj, config.max_geometry_vertices, config.coordinate_precision,
+                    )
+                except ValueError as error:
+                    raise ValueError(f"Cannot export source polygon '{source_id}': {error}") from error
+                for part in parts:
+                    properties = {**d_copy}
+                    _assign_ids(properties, polygon_id_counter, source_id)
+                    polygon_id_counter += 1
+                    polygon_features.append(
+                        {"type": "Feature", "geometry": mapping(part), "properties": properties}
+                    )
             else:
                 _assign_ids(d_copy, node_id_counter, source_id)
                 node_id_map[n] = d_copy["_id"]
