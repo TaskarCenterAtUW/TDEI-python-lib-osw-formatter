@@ -1,5 +1,11 @@
 # Change log
 
+### 0.4.5
+- Fix [BUG-4658](https://dev.azure.com/TDEI-UW/TDEI/_workitems/edit/4658) for custom polygon output by partitioning oversized OSM-derived polygons before OSW output validation. Count exterior and interior vertices using the validator's ring-closure rule, retain source tags and OSM references, and assign unique output IDs.
+- Keep adjoining cuts on the configured coordinate-precision grid and leave polygons within the limit unchanged. Retain output validation and report polygons that cannot be partitioned safely.
+- Add regression coverage for large relations assembled from smaller ways, a 41,842-vertex ring, holes, concave geometry, custom limits, coordinate precision, and output identity.
+- Add permanent OSM fixtures and conversion tests for an oversized multipolygon, a polygon exactly at the 2,000-vertex limit, and a polygon whose outer ring and hole together exceed the limit. Verify coverage, excluded holes, preserved properties, unique IDs, and schema-valid output.
+
 ### 0.4.4
 - Fix BUG-4638 by reading OSW enum values from the local dataset schemas bundled with `python-osw-validation`, replacing hardcoded lists for leaf attributes, buildings, highways, kerbs, surfaces, tactile paving, crossing markings, foot access and climb direction. Cache schema lookups without downloading schemas during conversion.
 - Apply feature-specific leaf constraints: `mixed` remains valid for tree rows and woods but is preserved under `ext:*` for individual trees. Preserve other unsupported enum values under `ext:*` and retain existing OSM tag translations.
