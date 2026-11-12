@@ -182,7 +182,7 @@ class OSWHelper:
         )
 
     @classmethod
-    async def write_og(cls, workdir: str, filename: str, og) -> List[str]:
+    async def write_og(cls, workdir: str, filename: str, og, config: FormatterConfig = None) -> List[str]:
         loop = asyncio.get_event_loop()
         points_path = Path(workdir, f'{filename}.graph.points.geojson')
         nodes_path = Path(workdir, f'{filename}.graph.nodes.geojson')
@@ -190,8 +190,13 @@ class OSWHelper:
         lines_path = Path(workdir, f'{filename}.graph.lines.geojson')
         zones_path = Path(workdir, f'{filename}.graph.zones.geojson')
         polygons_path = Path(workdir, f'{filename}.graph.polygons.geojson')
-        await loop.run_in_executor(None, og.to_geojson, nodes_path, edges_path, points_path, lines_path, zones_path,
-                                   polygons_path)
+        await loop.run_in_executor(
+            None,
+            lambda: og.to_geojson(
+                nodes_path, edges_path, points_path, lines_path, zones_path,
+                polygons_path, config=config,
+            ),
+        )
         # for the fi
         pot_gen_files = [str(nodes_path), str(edges_path), str(points_path), str(lines_path), str(zones_path),
                          str(polygons_path)]

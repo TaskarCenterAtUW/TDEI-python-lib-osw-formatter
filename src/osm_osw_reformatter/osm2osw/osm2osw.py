@@ -57,7 +57,9 @@ class OSM2OSW:
             await OSWHelper.construct_geometries(OG, config=self.config)
 
             # for OG in osm_graph_results:
-            generated_files = await OSWHelper.write_og(self.workdir, self.filename, OG)
+            generated_files = await OSWHelper.write_og(
+                self.workdir, self.filename, OG, config=self.config,
+            )
             self.generated_files = generated_files
             ensure_generated_files(generated_files, require_existing=True)
             if self.config.validate_output:
